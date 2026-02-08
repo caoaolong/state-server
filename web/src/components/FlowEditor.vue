@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick } from "vue";
+import { ref, onMounted, onUnmounted, computed, nextTick, inject } from "vue";
 import { type Node, type Edge, type Connection, type NodeChange, useVueFlow } from "@vue-flow/core";
 import { VueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
-import { NConfigProvider, NButton, NIcon, NDropdown, NMenu, NModal, NCard, NForm, NFormItem, NInput, NInputNumber, NDivider, darkTheme } from "naive-ui";
+import { NButton, NIcon, NDropdown, NMenu, NModal, NCard, NForm, NFormItem, NInput, NInputNumber, NDivider } from "naive-ui";
 import type { DropdownOption } from "naive-ui";
 import type { MenuOption } from "naive-ui";
 import { Moon, Sunny, Play, Stop, Add, GridOutline } from "@vicons/ionicons5";
@@ -13,12 +13,7 @@ import FlowNode from "./FlowNode.vue";
 import type { FlowNodeData } from "./FlowNode.vue";
 
 // dark mode
-const dark = ref(window.matchMedia("(prefers-color-scheme: dark)").matches);
-const theme = computed(() => (dark.value ? darkTheme : null));
-const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-const handleThemeChange = (e: MediaQueryListEvent) => {
-  dark.value = e.matches;
-};
+const dark = inject('app-dark-mode', ref(false));
 
 const nodes = ref<Node[]>([]);
 const edges = ref<Edge[]>([]);
@@ -463,7 +458,6 @@ const displayNodes = computed(() => {
 });
 
 onMounted(async () => {
-  mediaQuery.addEventListener("change", handleThemeChange);
   try {
     const data = await loadFlowData();
     nodes.value = data.nodes;
@@ -482,7 +476,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  mediaQuery.removeEventListener("change", handleThemeChange);
   if (runTimerId != null) {
     clearInterval(runTimerId);
     runTimerId = null;
@@ -493,7 +486,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <n-config-provider :theme="theme" style="height: 100%">
+  <div style="height: 100%">
     <VueFlow
       :fit-view-on-init="false"
       @connect="onConnect"
@@ -540,9 +533,8 @@ onUnmounted(() => {
         </n-dropdown>
       </div>
 
-      <!-- 右键菜单：固定位置 NMenu，包裹 NConfigProvider 以跟随系统主题 -->
+      <!-- 右键菜单：固定位置 NMenu -->
       <Teleport to="body">
-        <n-config-provider :theme="theme">
           <div
             v-if="contextMenuShow"
             class="flow-context-menu-backdrop"
@@ -571,7 +563,6 @@ onUnmounted(() => {
               @update:value="handleContextMenuSelect"
             />
           </div>
-        </n-config-provider>
       </Teleport>
 
       <div
@@ -730,7 +721,7 @@ onUnmounted(() => {
         </n-card>
       </n-modal>
     </VueFlow>
-  </n-config-provider>
+  </div>
 </template>
 
 <style>
