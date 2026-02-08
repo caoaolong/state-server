@@ -1,0 +1,206 @@
+/* Dark Theme for VueFlow */
+/* We override variables from theme-default.css within the .vue-flow-dark scope */
+
+.vue-flow-dark {
+  /* Backgrounds */
+  --vf-node-bg: #1a192b;
+  --vf-node-text: #f1f1f1;
+  --vf-connection-path: #b1b1b7;
+  --vf-handle: #aaa;
+  
+  /* Node Colors */
+  --vf-node-color: #999; /* Default node border/handle color */
+  --vf-box-shadow: #000;
+}
+
+/* Specific Node Colors overrides */
+.vue-flow-dark .vue-flow__node-input {
+  --vf-node-color: #3e7fff;
+  background: var(--vf-node-bg);
+}
+
+.vue-flow-dark .vue-flow__node-default {
+  --vf-node-color: #999;
+  background: var(--vf-node-bg);
+}
+
+.vue-flow-dark .vue-flow__node-output {
+  --vf-node-color: #ff0072;
+  background: var(--vf-node-bg);
+}
+
+/* 通用流程节点：与 default 一致的基础样式；悬停为手型，内部可响应鼠标事件 */
+.vue-flow-dark .vue-flow__node-flow {
+  --vf-node-color: #999;
+  background: var(--vf-node-bg);
+  border: 1px solid var(--vf-node-color);
+  border-radius: 3px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* flow 节点 - 深色主题：按类型区分的深色背景（偏暗） */
+.vue-flow-dark .vue-flow__node-flow.flow-type-character {
+  --vf-node-color: #7c3aed;
+  border-color: #7c3aed;
+  background: #1e0b30;
+}
+.vue-flow-dark .vue-flow__node-flow.flow-type-scene {
+  --vf-node-color: #059669;
+  border-color: #059669;
+  background: #022c22;
+}
+.vue-flow-dark .vue-flow__node-flow.flow-type-choice {
+  --vf-node-color: #d97706;
+  border-color: #d97706;
+  background: #431407;
+}
+.vue-flow-dark .vue-flow__node-flow.flow-type-control {
+  --vf-node-color: #dc2626;
+  border-color: #dc2626;
+  background: #450a0a;
+}
+.vue-flow-dark .vue-flow__node-flow.flow-type-order {
+  --vf-node-color: #2563eb;
+  border-color: #2563eb;
+  background: #0f172a;
+}
+.vue-flow-dark .vue-flow__node-flow.flow-type-default {
+  --vf-node-color: #999;
+  border-color: #999;
+  background: #18181b;
+}
+/* 节点编辑器：场景子类型、选择、结果 */
+.vue-flow-dark .vue-flow__node-flow.flow-type-scene-start {
+  --vf-node-color: #059669;
+  border-color: #059669;
+  background: #022c22;
+}
+.vue-flow-dark .vue-flow__node-flow.flow-type-scene-end {
+  --vf-node-color: #dc2626;
+  border-color: #dc2626;
+  background: #450a0a;
+}
+.vue-flow-dark .vue-flow__node-flow.flow-type-scene-default {
+  --vf-node-color: #0891b2;
+  border-color: #0891b2;
+  background: #164e63;
+}
+.vue-flow-dark .vue-flow__node-flow.flow-type-result {
+  --vf-node-color: #7c3aed;
+  border-color: #7c3aed;
+  background: #1e0b30;
+}
+
+/* 剧本杀节点类型 - 深色主题（保留以兼容非 flow 节点） */
+.vue-flow-dark .vue-flow__node-character {
+  --vf-node-color: #7c3aed;
+  border-color: #7c3aed;
+  background: #1e0b30;
+}
+.vue-flow-dark .vue-flow__node-scene {
+  --vf-node-color: #059669;
+  border-color: #059669;
+  background: #022c22;
+}
+.vue-flow-dark .vue-flow__node-choice {
+  --vf-node-color: #d97706;
+  border-color: #d97706;
+  background: #431407;
+}
+.vue-flow-dark .vue-flow__node-control {
+  --vf-node-color: #dc2626;
+  border-color: #dc2626;
+  background: #450a0a;
+}
+.vue-flow-dark .vue-flow__node-order {
+  --vf-node-color: #2563eb;
+  border-color: #2563eb;
+  background: #0f172a;
+}
+
+/* 
+  Override hardcoded colors in theme-default.css 
+  (styles that don't use variables)
+*/
+
+/* Edges */
+.vue-flow-dark .vue-flow__edge.updating .vue-flow__edge-path {
+  stroke: #aaa;
+}
+
+.vue-flow-dark .vue-flow__edge-text {
+  color: var(--vf-node-text);
+}
+
+.vue-flow__edge-labels {
+	color: var(--vf-node-text);
+}
+
+/* Selected States - override hardcoded borders */
+.vue-flow-dark .vue-flow__node-default.selected,
+.vue-flow-dark .vue-flow__node-default:focus,
+.vue-flow-dark .vue-flow__node-default:focus-visible,
+.vue-flow-dark .vue-flow__node-input.selected,
+.vue-flow-dark .vue-flow__node-input:focus,
+.vue-flow-dark .vue-flow__node-input:focus-visible,
+.vue-flow-dark .vue-flow__node-output.selected,
+.vue-flow-dark .vue-flow__node-output:focus,
+.vue-flow-dark .vue-flow__node-output:focus-visible,
+.vue-flow-dark .vue-flow__node-flow.selected,
+.vue-flow-dark .vue-flow__node-flow:focus,
+.vue-flow-dark .vue-flow__node-flow:focus-visible {
+  border-color: #aaa;
+}
+
+/* Hover Shadows */
+.vue-flow-dark .vue-flow__node-default.selectable:hover,
+.vue-flow-dark .vue-flow__node-input.selectable:hover,
+.vue-flow-dark .vue-flow__node-output.selectable:hover,
+.vue-flow-dark .vue-flow__node-flow.selectable:hover {
+  box-shadow: 0 1px 4px 1px rgba(255, 255, 255, 0.08);
+}
+
+/* Selection Rectangle */
+.vue-flow-dark .vue-flow__nodesselection-rect,
+.vue-flow-dark .vue-flow__selection {
+  background: rgba(0, 89, 220, 0.15);
+  border-color: rgba(0, 89, 220, 0.8);
+}
+
+/* Ensure handles match the new variables if they were hardcoded */
+.vue-flow-dark .vue-flow__handle {
+  border-color: var(--vf-node-bg); /* Cutout effect */
+}
+
+/* ========== 浅色主题：无 .vue-flow-dark 时使用浅色节点背景 ========== */
+.vue-flow__node-flow.flow-type-character {
+  background: #ede9fe;
+}
+.vue-flow__node-flow.flow-type-scene {
+  background: #d1fae5;
+}
+.vue-flow__node-flow.flow-type-choice {
+  background: #fef3c7;
+}
+.vue-flow__node-flow.flow-type-control {
+  background: #fee2e2;
+}
+.vue-flow__node-flow.flow-type-order {
+  background: #dbeafe;
+}
+.vue-flow__node-flow.flow-type-default {
+  background: #f4f4f5;
+}
+.vue-flow__node-flow.flow-type-scene-start {
+  background: #d1fae5;
+}
+.vue-flow__node-flow.flow-type-scene-end {
+  background: #fee2e2;
+}
+.vue-flow__node-flow.flow-type-scene-default {
+  background: #cffafe;
+}
+.vue-flow__node-flow.flow-type-result {
+  background: #ede9fe;
+}

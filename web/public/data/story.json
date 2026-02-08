@@ -1,0 +1,140 @@
+{
+    "nodes": {
+        "characters": [
+            {
+                "id": "Character1",
+                "type": "single",
+                "label": "贝克·巴顿"
+            },
+            {
+                "id": "Character2",
+                "type": "single",
+                "label": "沃尔夫·肖"
+            },
+            {
+                "id": "Character3",
+                "type": "single",
+                "label": "马克·亨特"
+            },
+            {
+                "id": "Character4",
+                "type": "single",
+                "label": "琼恩·派克"
+            },
+            {
+                "id": "Character5",
+                "type": "single",
+                "label": "艾琳·琼斯"
+            }
+        ],
+        "scenes": [
+            {
+                "id": "Scene1",
+                "label": "第一幕"
+            },
+            {
+                "id": "Scene2",
+                "label": "第二幕"
+            },
+            {
+                "id": "Scene3",
+                "label": "第三幕"
+            },
+            {
+                "id": "Scene4",
+                "label": "第四幕"
+            }
+        ],
+        "choices": [
+            {
+                "id": "Scene41",
+                "option": "A",
+                "label": "逃生环节"
+            },
+            {
+                "id": "Scene42",
+                "option": "B",
+                "label": "放FBI进来"
+            }
+        ],
+        "controls": [
+            {
+                "id": "Start",
+                "label": "开始"
+            },
+            {
+                "id": "End",
+                "label": "结束"
+            },
+            {
+                "id": "SceneIntroduction",
+                "label": "场景介绍"
+            },
+            {
+                "id": "PrivateConversation",
+                "label": "私人对话"
+            }
+        ],
+        "orders": [
+            {
+                "id": "CharacterBackgroundIntroduction",
+                "label": "角色背景介绍"
+            },
+            {
+                "id": "DisProps",
+                "label": "分发道具"
+            },
+            {
+                "id": "ScenePerformance",
+                "label": "场景表演"
+            },
+            {
+                "id": "SceneSettlement",
+                "label": "场景结算"
+            },
+            {
+                "id": "ObtainClues",
+                "label": "获取线索"
+            },
+            {
+                "id": "SceneChoice",
+                "label": "场景选择"
+            }
+        ]
+    },
+    "master": [
+        "Start",
+        "Scene1",
+        "SceneIntroduction",
+        "CharacterBackgroundIntroduction",
+        "Scene2",
+        "SceneIntroduction",
+        "DisProps",
+        "ScenePerformance",
+        "SceneSettlement",
+        "Scene3",
+        "SceneIntroduction",
+        "ScenePerformance",
+        "SceneSettlement",
+        "Scene4",
+        "SceneIntroduction",
+        "ObtainClues | PrivateConversation",
+        "SceneChoice{Scene41, Scene42}",
+        "SceneSettlement",
+        "End"
+    ],
+    "slaves": {
+        "Scene41": [
+            "Scene41",
+            "SceneIntroduction",
+            "ScenePerformance",
+            "SceneSettlement"
+        ],
+        "Scene42": [
+            "Scene42",
+            "SceneIntroduction",
+            "ScenePerformance",
+            "SceneSettlement"
+        ]
+    }
+}
