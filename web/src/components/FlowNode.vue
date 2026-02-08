@@ -37,6 +37,9 @@ export interface FlowNodeData {
   inputCount?: number;
   nodeType?: string;
   option?: string;
+  description?: string;
+  options?: Array<{ label: string; description: string }>;
+  results?: Array<{ label: string; description: string }>;
   isRunning?: boolean;
   nodeState?: Exclude<NodeState, "normal"> | null;
   onRun?: () => void;
@@ -73,6 +76,14 @@ const sceneKind = computed(() => props.data?.nodeKind ?? "default");
 
 // 场景：开始无输入、结束无输出、普通一入一出
 const isScene = computed(() => category.value === "scene");
+const isStartOrEnd = computed(() => isScene.value && (sceneKind.value === "start" || sceneKind.value === "end"));
+const isNormalScene = computed(() => isScene.value && sceneKind.value === "default");
+const isFormNode = computed(
+  () =>
+    isNormalScene.value ||
+    isChoice.value ||
+    isResult.value
+);
 const showSceneTarget = computed(
   () => isScene.value && (sceneKind.value === "end" || sceneKind.value === "default")
 );
@@ -130,13 +141,13 @@ function onDelete() {
     :data-node-kind="isScene ? sceneKind : undefined"
   >
     <NodeToolbar :position="Position.Top" :offset="8" align="center" class="flow-node-toolbar">
-      <n-button quaternary size="small" title="复制" @click.stop="onCopy">
+      <n-button v-if="!isStartOrEnd" quaternary size="small" title="复制" @click.stop="onCopy">
         <template #icon>
           <n-icon :component="CopyOutline" />
         </template>
         复制
       </n-button>
-      <n-button quaternary size="small" title="编辑" @click.stop="onEdit">
+      <n-button v-if="!isStartOrEnd" quaternary size="small" title="编辑" @click.stop="onEdit">
         <template #icon>
           <n-icon :component="CreateOutline" />
         </template>
@@ -190,11 +201,51 @@ function onDelete() {
         </div>
       </template>
       <div class="flow-node__content">
-        <span class="flow-node__label">{{ data?.label ?? id }}</span>
-        <span v-if="data?.option" class="flow-node__option">{{ data.option }}</span>
+        <template v-if="isFormNode">
+          <!-- 普通场景：描述 -->
+          <template v-if="isNormalScene">
+            <div class="flow-node__text-content" v-if="data.description">
+              {{ data.description }}
+            </div>
+            <div class="flow-node__text-empty" v-else>
+              暂无描述
+            </div>
+          </template>
+
+          <!-- 选择节点：显示选项列表摘要 -->
+          <template v-else-if="isChoice">
+            <div class="flow-node__list-content">
+              <div v-for="(opt, index) in data.options" :key="index" class="flow-node__list-item">
+                <span class="flow-node__list-index">{{ index + 1 }}.</span>
+                <span class="flow-node__list-label">{{ opt.label || '未命名' }}</span>
+              </div>
+              <div v-if="!data.options?.length" class="flow-node__text-empty">
+                暂无选项
+              </div>
+            </div>
+          </template>
+
+          <!-- 结果节点：显示结果列表摘要 -->
+          <template v-else-if="isResult">
+            <div class="flow-node__list-content">
+              <div v-for="(res, index) in data.results" :key="index" class="flow-node__list-item">
+                <span class="flow-node__list-index">{{ index + 1 }}.</span>
+                <span class="flow-node__list-label">{{ res.label || '未命名' }}</span>
+              </div>
+              <div v-if="!data.results?.length" class="flow-node__text-empty">
+                暂无结果
+              </div>
+            </div>
+          </template>
+        </template>
+        <template v-else>
+          <span class="flow-node__label">{{ data?.label ?? id }}</span>
+          <span v-if="data?.option" class="flow-node__option">{{ data.option }}</span>
+        </template>
       </div>
       <template #footer>
-        <div class="flow-node__footer">
+        <div class="flow-node__footer" :class="{ 'flow-node__footer--between': isFormNode }">
+          <span v-if="isFormNode" class="flow-node__footer-label" :title="data?.label">{{ data?.label }}</span>
           <n-button quaternary circle size="small" title="日志">
             <template #icon>
               <n-icon :component="DocumentTextOutline" />
@@ -278,6 +329,20 @@ function onDelete() {
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
+}
+
+.flow-node__footer--between {
+  justify-content: space-between;
+}
+
+.flow-node__footer-label {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  margin-right: 8px;
+  color: var(--vf-node-text, #f1f1f1);
 }
 
 .flow-node__header {
@@ -388,5 +453,45 @@ function onDelete() {
 .flow-node--result .flow-node__handle {
   border-color: #7c3aed;
   color: #7c3aed;
+}
+
+.flow-node__text-content {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--vf-node-text, #f1f1f1);
+  opacity: 0.9;
+  word-break: break-all;
+}
+
+.flow-node__text-empty {
+  font-size: 12px;
+  color: var(--vf-node-text, #f1f1f1);
+  opacity: 0.5;
+  font-style: italic;
+}
+
+.flow-node__list-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.flow-node__list-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.flow-node__list-index {
+  opacity: 0.6;
+  min-width: 16px;
+}
+
+.flow-node__list-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
