@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { h, ref, computed, provide, onMounted, onUnmounted, type Component } from "vue";
+import { h, ref, computed, provide, watch, onMounted, onUnmounted, type Component } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import { NConfigProvider, darkTheme, zhCN, dateZhCN, NLayout, NLayoutSider, NLayoutContent, NMenu, NIcon, type MenuOption } from "naive-ui";
 import { BookOutline, SettingsOutline, ShareSocialOutline } from "@vicons/ionicons5";
-import FlowEditor from "./components/FlowEditor.vue";
+
+const router = useRouter();
+const route = useRoute();
 
 function renderIcon(icon: Component) {
   return () => h(NIcon, null, { default: () => h(icon) });
@@ -11,7 +14,7 @@ function renderIcon(icon: Component) {
 // Global Theme Management
 const dark = ref(window.matchMedia("(prefers-color-scheme: dark)").matches);
 const theme = computed(() => (dark.value ? darkTheme : null));
-provide('app-dark-mode', dark);
+provide("app-dark-mode", dark);
 
 const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 const handleThemeChange = (e: MediaQueryListEvent) => {
@@ -28,23 +31,48 @@ onUnmounted(() => {
 
 const menuOptions: MenuOption[] = [
   {
-    label: "流程设计",
-    key: "flow-design",
+    label: "状态机",
+    key: "state-machines",
     icon: renderIcon(ShareSocialOutline),
+    children: [
+      { label: "列表", key: "/state-machines/list" },
+      { label: "设计", key: "/state-machines/design" },
+    ],
   },
   {
-    label: "我的项目",
-    key: "projects",
+    label: "会话",
+    key: "sessions",
     icon: renderIcon(BookOutline),
+    children: [
+      { label: "列表", key: "/sessions/list" },
+      { label: "历史", key: "/sessions/history" },
+    ],
   },
   {
-    label: "系统设置",
-    key: "settings",
+    label: "设置",
+    key: "/settings",
     icon: renderIcon(SettingsOutline),
   },
 ];
 
-const activeKey = ref("flow-design");
+const activeKey = computed(() => route.path);
+
+const expandedKeys = ref<string[]>([]);
+watch(
+  () => route.path,
+  (path) => {
+    const keys: string[] = [];
+    if (path.startsWith("/state-machines")) keys.push("state-machines");
+    if (path.startsWith("/sessions")) keys.push("sessions");
+    expandedKeys.value = keys;
+  },
+  { immediate: true }
+);
+
+function handleMenuSelect(key: string) {
+  if (key.startsWith("/")) router.push(key);
+}
+
 const collapsed = ref(false);
 </script>
 
@@ -62,15 +90,17 @@ const collapsed = ref(false);
         @expand="collapsed = false"
       >
         <n-menu
-          v-model:value="activeKey"
+          :value="activeKey"
+          v-model:expanded-keys="expandedKeys"
           :collapsed="collapsed"
           :collapsed-width="64"
           :collapsed-icon-size="22"
           :options="menuOptions"
+          @update:value="handleMenuSelect"
         />
       </n-layout-sider>
       <n-layout-content class="content-layout">
-        <FlowEditor />
+        <router-view />
       </n-layout-content>
     </n-layout>
   </n-config-provider>
@@ -83,6 +113,7 @@ const collapsed = ref(false);
   left: 0;
   height: 100%;
   width: 100%;
+  overflow: hidden;
 }
 
 .app-provider {

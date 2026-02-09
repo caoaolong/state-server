@@ -49,7 +49,7 @@ const STATE_CONFIG: Record<
   NodeState,
   { label: string; icon: typeof PlayCircle; class: string }
 > = {
-  normal: { label: "正常", icon: EllipseOutline, class: "flow-node__state--normal" },
+  normal: { label: "等待中", icon: EllipseOutline, class: "flow-node__state--normal" },
   running: { label: "运行中", icon: PlayCircle, class: "flow-node__state--running" },
   paused: { label: "已暂停", icon: PauseCircle, class: "flow-node__state--paused" },
   completed: { label: "已完成", icon: CheckmarkCircle, class: "flow-node__state--completed" },

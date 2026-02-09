@@ -7,7 +7,7 @@ import { NButton, NIcon, NDropdown, NMenu, NModal, NCard, NForm, NFormItem, NInp
 import type { DropdownOption } from "naive-ui";
 import type { MenuOption } from "naive-ui";
 import { Moon, Sunny, Play, Stop, Add, GridOutline } from "@vicons/ionicons5";
-import { loadFlowData } from "../api";
+import { getFlowData } from "../api";
 import { useLayout } from "../core/layout";
 import FlowNode from "./FlowNode.vue";
 import type { FlowNodeData } from "./FlowNode.vue";
@@ -459,7 +459,7 @@ const displayNodes = computed(() => {
 
 onMounted(async () => {
   try {
-    const data = await loadFlowData();
+    const data = await getFlowData();
     nodes.value = data.nodes;
     edges.value = data.edges;
   } catch {
