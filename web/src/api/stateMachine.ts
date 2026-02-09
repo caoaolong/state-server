@@ -64,6 +64,21 @@ export interface StateMachineUpdateResponse {
   updatedAt: string;
 }
 
+/** 保存流程 - 请求（与 FlowData 一致：nodes + edges） */
+export type FlowSaveRequest = FlowData;
+
+/** 保存流程 - 返回 */
+export interface FlowSaveResponse {
+  ok: boolean;
+  updatedAt?: string;
+}
+
+/**
+ * 保存流程 - 请求体示例
+ *
+ * PUT /state-machines/:id/flow
+ */
+
 const BASE = import.meta.env.VITE_API_BASE ?? "";
 
 /**
@@ -115,6 +130,23 @@ export async function getFlowData(stateMachineId?: string): Promise<FlowData> {
   } catch {
     return { nodes: [], edges: [] };
   }
+}
+
+/**
+ * 保存状态机流程数据（设计页保存画布）
+ * PUT /state-machines/:id/flow
+ * 请求体: FlowSaveRequest { nodes: Node[], edges: Edge[] }
+ * 返回: FlowSaveResponse { ok: boolean, updatedAt?: string }
+ */
+export async function saveFlow(
+  stateMachineId: string,
+  flowData: FlowSaveRequest
+): Promise<FlowSaveResponse> {
+  return http<FlowSaveResponse>({
+    method: "PUT",
+    url: `${BASE}/state-machines/${stateMachineId}/flow`,
+    body: flowData,
+  });
 }
 
 /**

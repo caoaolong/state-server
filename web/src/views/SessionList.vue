@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, h } from "vue";
 import { NDataTable, NCard, NButton, NTag, type DataTableColumns } from "naive-ui";
+import { formatDateTime } from "../utils/date";
 
 interface SessionRow {
   id: string;
@@ -26,7 +27,7 @@ const columns: DataTableColumns<SessionRow> = [
       return h(NTag, { type, size: "small" }, () => row.status);
     },
   },
-  { title: "创建时间", key: "createdAt", width: 180 },
+  { title: "创建时间", key: "createdAt", width: 180, render: (row) => formatDateTime(row.createdAt) },
   {
     title: "操作",
     key: "actions",

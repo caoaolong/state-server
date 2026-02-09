@@ -1,1 +1,8 @@
 /web/node_modules/
+
+__debug_bin*
+
+*.example
+*.db
+*.db-shm
+*.db-wal

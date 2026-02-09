@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { h, ref, computed, provide, watch, onMounted, onUnmounted, type Component } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { NConfigProvider, darkTheme, zhCN, dateZhCN, NLayout, NLayoutSider, NLayoutContent, NMenu, NIcon, type MenuOption } from "naive-ui";
-import { BookOutline, SettingsOutline, ShareSocialOutline } from "@vicons/ionicons5";
+import { NConfigProvider, NMessageProvider, darkTheme, zhCN, dateZhCN, NLayout, NLayoutSider, NLayoutContent, NMenu, NIcon, type MenuOption } from "naive-ui";
+import { BookOutline, DocumentTextOutline, SettingsOutline, ShareSocialOutline } from "@vicons/ionicons5";
 
 const router = useRouter();
 const route = useRoute();
@@ -49,6 +49,11 @@ const menuOptions: MenuOption[] = [
     ],
   },
   {
+    label: "文档",
+    key: "/docs",
+    icon: renderIcon(DocumentTextOutline),
+  },
+  {
     label: "设置",
     key: "/settings",
     icon: renderIcon(SettingsOutline),
@@ -78,7 +83,8 @@ const collapsed = ref(false);
 
 <template>
   <n-config-provider :theme="theme" :locale="zhCN" :date-locale="dateZhCN" class="app-provider">
-    <n-layout has-sider class="main-layout">
+    <n-message-provider>
+      <n-layout has-sider class="main-layout">
       <n-layout-sider
         bordered
         collapse-mode="width"
@@ -103,16 +109,27 @@ const collapsed = ref(false);
         <router-view />
       </n-layout-content>
     </n-layout>
+    </n-message-provider>
   </n-config-provider>
 </template>
 
 <style>
+/* 全局隐藏滚动条，保留滚动 */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 #app {
   position: absolute;
   top: 0;
   left: 0;
   height: 100%;
   width: 100%;
+  min-width: 1280px;
   overflow: hidden;
 }
 

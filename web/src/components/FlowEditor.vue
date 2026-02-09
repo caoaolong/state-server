@@ -1,19 +1,29 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, nextTick, inject } from "vue";
-import { type Node, type Edge, type Connection, type NodeChange, useVueFlow } from "@vue-flow/core";
+import { useRoute, useRouter } from "vue-router";
+import { type Node, type Edge, type Connection, type NodeChange, type EdgeChange, useVueFlow } from "@vue-flow/core";
 import { VueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
-import { NButton, NIcon, NDropdown, NMenu, NModal, NCard, NForm, NFormItem, NInput, NInputNumber, NDivider } from "naive-ui";
+import { NButton, NIcon, NDropdown, NMenu, NModal, NCard, NForm, NFormItem, NInput, NInputNumber, NDivider, useMessage } from "naive-ui";
 import type { DropdownOption } from "naive-ui";
 import type { MenuOption } from "naive-ui";
-import { Moon, Sunny, Play, Stop, Add, GridOutline } from "@vicons/ionicons5";
-import { getFlowData } from "../api";
+import { Moon, Sunny, Play, Stop, Add, GridOutline, SaveOutline } from "@vicons/ionicons5";
+import { getFlowData, getStateMachineById, saveFlow, createStateMachine, updateStateMachine } from "../api";
 import { useLayout } from "../core/layout";
 import FlowNode from "./FlowNode.vue";
 import type { FlowNodeData } from "./FlowNode.vue";
 
-// dark mode
+const route = useRoute();
+const router = useRouter();
+const message = useMessage();
 const dark = inject('app-dark-mode', ref(false));
+
+/** 当前编辑的状态机 ID（来自路由 /state-machines/design/:id），无则为新建 */
+const stateMachineId = computed(() => route.params.id as string | undefined);
+/** 当前状态机名称（编辑时从接口加载，用于保存对话框预填） */
+const stateMachineName = ref("");
+/** 当前状态机描述（编辑时从接口加载，用于保存对话框预填） */
+const stateMachineDescription = ref("");
 
 const nodes = ref<Node[]>([]);
 const edges = ref<Edge[]>([]);
@@ -53,6 +63,15 @@ function onNodesChange(changes: NodeChange[]) {
   });
 }
 
+// 边变更：选中边后按 Delete/Backspace 删除时同步到 edges
+function onEdgesChange(changes: EdgeChange[]) {
+  const removeIds = new Set(
+    changes.filter((c): c is EdgeChange & { type: "remove" } => c.type === "remove").map((c) => c.id)
+  );
+  if (removeIds.size === 0) return;
+  edges.value = edges.value.filter((e) => !removeIds.has(e.id));
+}
+
 // 节点创建：唯一 id 计数
 const idCounters = ref({ sceneStart: 0, sceneEnd: 0, sceneDefault: 0, choice: 0, result: 0 });
 function nextId(kind: keyof typeof idCounters.value): string {
@@ -77,6 +96,17 @@ function hasNodeKind(kind: string): boolean {
       (n.data as FlowNodeData)?.nodeCategory === "scene" &&
       (n.data as FlowNodeData)?.nodeKind === kind
   );
+}
+
+/** 根据节点 data 计算样式 class（回显时恢复颜色） */
+function getNodeClass(data: FlowNodeData | undefined): string {
+  if (!data) return "";
+  const cat = data.nodeCategory;
+  const kind = data.nodeKind;
+  if (cat === "scene") return `flow-type-scene flow-type-scene-${kind ?? "default"}`;
+  if (cat === "choice") return "flow-type-choice";
+  if (cat === "result") return "flow-type-result";
+  return "";
 }
 
 /** 在画布坐标 position 处创建节点 */
@@ -151,6 +181,7 @@ let lastContextEvent: MouseEvent | null = null;
 
 function onPaneContextMenu(event: MouseEvent) {
   event.preventDefault();
+  edgeContextMenuShow.value = false;
   lastContextEvent = event;
   contextMenuPosition.value = { x: event.clientX, y: event.clientY };
   contextMenuShow.value = true;
@@ -163,6 +194,34 @@ function handleContextMenuSelect(key: string) {
   }
   contextMenuShow.value = false;
   lastContextEvent = null;
+}
+
+// 边的右键菜单：删除连线
+const edgeContextMenuShow = ref(false);
+const edgeContextMenuPosition = ref({ x: 0, y: 0 });
+const edgeContextMenuEdgeId = ref<string | null>(null);
+
+function onEdgeContextMenu(ev: { event: MouseEvent | TouchEvent; edge: { id: string } }) {
+  ev.event.preventDefault();
+  contextMenuShow.value = false;
+  edgeContextMenuEdgeId.value = ev.edge.id;
+  const e = ev.event as MouseEvent;
+  edgeContextMenuPosition.value = { x: e.clientX, y: e.clientY };
+  edgeContextMenuShow.value = true;
+}
+
+const edgeContextMenuOptions: MenuOption[] = [{ label: "删除连线", key: "delete-edge" }];
+
+function handleEdgeContextMenuSelect(key: string) {
+  if (key === "delete-edge" && edgeContextMenuEdgeId.value) {
+    edges.value = edges.value.filter((e) => e.id !== edgeContextMenuEdgeId.value);
+  }
+  closeEdgeContextMenu();
+}
+
+function closeEdgeContextMenu() {
+  edgeContextMenuShow.value = false;
+  edgeContextMenuEdgeId.value = null;
 }
 
 // 左上角悬浮按钮菜单（在画布默认位置创建）
@@ -457,10 +516,59 @@ const displayNodes = computed(() => {
   });
 });
 
-onMounted(async () => {
+const saveLoading = ref(false);
+const showSaveModal = ref(false);
+const saveFormName = ref("");
+const saveFormDescription = ref("");
+
+function openSaveModal() {
+  saveFormName.value = stateMachineId.value ? stateMachineName.value || "未命名状态机" : "未命名状态机";
+  saveFormDescription.value = stateMachineDescription.value;
+  showSaveModal.value = true;
+}
+
+async function doSaveConfirm() {
+  const name = saveFormName.value.trim();
+  if (!name) {
+    message.warning("请输入流程图名称");
+    return;
+  }
+  saveLoading.value = true;
   try {
-    const data = await getFlowData();
-    nodes.value = data.nodes;
+    let id = stateMachineId.value;
+    const description = saveFormDescription.value.trim();
+    if (!id) {
+      const created = await createStateMachine({ name, description: description || undefined });
+      id = created.id;
+      await saveFlow(id, { nodes: nodes.value, edges: edges.value });
+      router.replace(`/state-machines/design/${id}`);
+      stateMachineName.value = name;
+      stateMachineDescription.value = description;
+      showSaveModal.value = false;
+      message.success("新建并保存成功");
+    } else {
+      await updateStateMachine(id, { name, description: description || undefined });
+      await saveFlow(id, { nodes: nodes.value, edges: edges.value });
+      stateMachineName.value = name;
+      stateMachineDescription.value = description;
+      showSaveModal.value = false;
+      message.success("保存成功");
+    }
+  } catch (e) {
+    message.error(e instanceof Error ? e.message : "保存失败");
+  } finally {
+    saveLoading.value = false;
+  }
+}
+
+onMounted(async () => {
+  const id = stateMachineId.value;
+  try {
+    const data = await getFlowData(id);
+    nodes.value = data.nodes.map((n) => ({
+      ...n,
+      class: n.class || getNodeClass(n.data as FlowNodeData),
+    }));
     edges.value = data.edges;
   } catch {
     nodes.value = [];
@@ -471,6 +579,16 @@ onMounted(async () => {
     }
     if (!hasNodeKind("end")) {
       addNodeAt({ x: 500, y: 200 }, "scene-end");
+    }
+  }
+  if (id) {
+    try {
+      const detail = await getStateMachineById(id);
+      stateMachineName.value = detail.name ?? "";
+      stateMachineDescription.value = detail.description ?? "";
+    } catch {
+      stateMachineName.value = "";
+      stateMachineDescription.value = "";
     }
   }
 });
@@ -491,7 +609,9 @@ onUnmounted(() => {
       :fit-view-on-init="false"
       @connect="onConnect"
       @nodes-change="onNodesChange"
+      @edges-change="onEdgesChange"
       @pane-context-menu="onPaneContextMenu"
+      @edge-context-menu="onEdgeContextMenu"
       :nodes="displayNodes"
       :edges="edges"
       :class="{ 'vue-flow-dark': dark }"
@@ -563,6 +683,33 @@ onUnmounted(() => {
               @update:value="handleContextMenuSelect"
             />
           </div>
+          <!-- 边的右键菜单：删除连线 -->
+          <div
+            v-if="edgeContextMenuShow"
+            class="flow-context-menu-backdrop"
+            style="position: fixed; inset: 0; z-index: 9997;"
+            @click="closeEdgeContextMenu"
+            @contextmenu.prevent="edgeContextMenuShow = false"
+          />
+          <div
+            v-if="edgeContextMenuShow"
+            class="flow-context-menu-panel"
+            :class="{ 'flow-context-menu-panel--dark': dark }"
+            :style="{
+              position: 'fixed',
+              left: edgeContextMenuPosition.x + 'px',
+              top: edgeContextMenuPosition.y + 'px',
+              zIndex: 9999,
+              minWidth: '120px',
+            }"
+            @click.stop
+          >
+            <n-menu
+              :options="edgeContextMenuOptions"
+              :value="null"
+              @update:value="handleEdgeContextMenuSelect"
+            />
+          </div>
       </Teleport>
 
       <div
@@ -587,6 +734,17 @@ onUnmounted(() => {
         </n-button>
         <n-button
           circle
+          type="primary"
+          :loading="saveLoading"
+          title="保存流程（无 ID 时先新建再保存）"
+          @click="openSaveModal"
+        >
+          <template #icon>
+            <n-icon><SaveOutline /></n-icon>
+          </template>
+        </n-button>
+        <n-button
+          circle
           :type="runningNodeId ? 'error' : 'primary'"
           :title="runningNodeId ? '停止测试运行' : '测试运行'"
           @click="startTestRun"
@@ -607,6 +765,41 @@ onUnmounted(() => {
           </template>
         </n-button>
       </div>
+
+      <!-- 保存流程图对话框 -->
+      <n-modal v-model:show="showSaveModal" :mask-closable="false">
+        <n-card
+          style="width: 400px"
+          title="保存流程图"
+          :bordered="false"
+          role="dialog"
+          aria-modal="true"
+        >
+          <n-form-item label="流程图名称">
+            <n-input
+              v-model:value="saveFormName"
+              placeholder="请输入流程图名称"
+              clearable
+              @keyup.enter="doSaveConfirm"
+            />
+          </n-form-item>
+          <n-form-item label="描述">
+            <n-input
+              v-model:value="saveFormDescription"
+              type="textarea"
+              placeholder="请输入描述（选填）"
+              :autosize="{ minRows: 2, maxRows: 6 }"
+              clearable
+            />
+          </n-form-item>
+          <template #footer>
+            <div style="display: flex; justify-content: flex-end; gap: 8px">
+              <n-button @click="showSaveModal = false">取消</n-button>
+              <n-button type="primary" :loading="saveLoading" @click="doSaveConfirm">确定</n-button>
+            </div>
+          </template>
+        </n-card>
+      </n-modal>
 
       <!-- 节点编辑模态框 -->
       <n-modal v-model:show="showEditModal">

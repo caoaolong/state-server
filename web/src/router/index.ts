@@ -22,7 +22,7 @@ const routes: RouteRecordRaw[] = [
         meta: { title: "状态机列表" },
       },
       {
-        path: "design",
+        path: "design/:id?",
         name: "StateMachineDesign",
         component: () => import("../views/StateMachineDesign.vue"),
         meta: { title: "状态机设计" },
@@ -45,6 +45,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: "会话历史" },
       },
     ],
+  },
+  {
+    path: "/docs",
+    name: "Docs",
+    component: () => import("../views/DocsPage.vue"),
+    meta: { title: "文档" },
   },
   {
     path: "/settings",

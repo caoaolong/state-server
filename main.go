@@ -4,7 +4,9 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/yourname/state-monitor/routers"
 )
 
 // //go:embed web/dist/**
@@ -16,8 +18,8 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func handleWebsocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+func handleWebsocket(c *gin.Context) {
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Println("Failed to upgrade to WebSocket:", err)
 		return
@@ -40,6 +42,8 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/ws", handleWebsocket)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	r := gin.Default()
+	r.GET("/ws", handleWebsocket)
+	routers.RegisterStateMachineRoutes(r)
+	log.Fatal(r.Run(":8080"))
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, h } from "vue";
 import { NDataTable, NCard, NButton, type DataTableColumns } from "naive-ui";
+import { formatDateTime } from "../utils/date";
 
 interface HistoryRow {
   id: string;
@@ -20,7 +21,7 @@ const columns: DataTableColumns<HistoryRow> = [
   { title: "事件", key: "event", width: 120 },
   { title: "原状态", key: "fromState", width: 120 },
   { title: "目标状态", key: "toState", width: 120 },
-  { title: "时间", key: "createdAt", width: 180 },
+  { title: "时间", key: "createdAt", width: 180, render: (row) => formatDateTime(row.createdAt) },
   {
     title: "操作",
     key: "actions",
