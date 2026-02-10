@@ -45,5 +45,7 @@ func main() {
 	r := gin.Default()
 	r.GET("/ws", handleWebsocket)
 	routers.RegisterStateMachineRoutes(r)
+	routers.RegisterSessionRoutes(r)
+	routers.RegisterApiKeyRoutes(r)
 	log.Fatal(r.Run(":8080"))
 }

@@ -7,7 +7,7 @@ import { Background } from "@vue-flow/background";
 import { NButton, NIcon, NDropdown, NMenu, NModal, NCard, NForm, NFormItem, NInput, NInputNumber, NDivider, useMessage } from "naive-ui";
 import type { DropdownOption } from "naive-ui";
 import type { MenuOption } from "naive-ui";
-import { Moon, Sunny, Play, Stop, Add, GridOutline, SaveOutline } from "@vicons/ionicons5";
+import { Play, Stop, Add, GridOutline, SaveOutline } from "@vicons/ionicons5";
 import { getFlowData, getStateMachineById, saveFlow, createStateMachine, updateStateMachine } from "../api";
 import { useLayout } from "../core/layout";
 import FlowNode from "./FlowNode.vue";
@@ -24,6 +24,8 @@ const stateMachineId = computed(() => route.params.id as string | undefined);
 const stateMachineName = ref("");
 /** 当前状态机描述（编辑时从接口加载，用于保存对话框预填） */
 const stateMachineDescription = ref("");
+/** 当前状态机 baseUrl（请求基础地址，与节点请求路径拼接） */
+const stateMachineBaseUrl = ref("");
 
 const nodes = ref<Node[]>([]);
 const edges = ref<Edge[]>([]);
@@ -274,6 +276,10 @@ const editingNodeId = ref<string | null>(null);
 interface EditFormModel {
   label: string;
   description: string;
+  // 请求配置（不包含 base_url）
+  requestPath: string;
+  requestMethod: string;
+  requestData: string;
   // Choice
   outputCount: number;
   options: Array<{ label: string; description: string }>;
@@ -288,6 +294,9 @@ interface EditFormModel {
 const editFormModel = ref<EditFormModel>({
   label: "",
   description: "",
+  requestPath: "",
+  requestMethod: "",
+  requestData: "",
   outputCount: 1,
   options: [],
   inputCount: 1,
@@ -310,6 +319,9 @@ function onNodeEdit(nodeId: string) {
   editFormModel.value = {
     label: data.label ?? "",
     description: data.description ?? "",
+    requestPath: data.requestPath ?? "",
+    requestMethod: data.requestMethod ?? "",
+    requestData: data.requestData ?? "",
     outputCount: data.outputCount ?? 1,
     options: data.options ? JSON.parse(JSON.stringify(data.options)) : [],
     inputCount: data.inputCount ?? 1,
@@ -317,7 +329,7 @@ function onNodeEdit(nodeId: string) {
     nodeCategory: data.nodeCategory,
     nodeKind: data.nodeKind,
   };
-  
+
   showEditModal.value = true;
 }
 
@@ -365,8 +377,11 @@ function handleEditSave() {
       const newData: FlowNodeData = {
         ...n.data,
         label: editFormModel.value.label,
+        requestPath: editFormModel.value.requestPath || undefined,
+        requestMethod: editFormModel.value.requestMethod || undefined,
+        requestData: editFormModel.value.requestData || undefined,
       };
-      
+
       // Update specific fields based on type
       if (editFormModel.value.nodeCategory === "scene" && editFormModel.value.nodeKind === "default") {
         newData.description = editFormModel.value.description;
@@ -377,7 +392,7 @@ function handleEditSave() {
         newData.inputCount = editFormModel.value.inputCount;
         newData.results = JSON.parse(JSON.stringify(editFormModel.value.results));
       }
-      
+
       return {
         ...n,
         data: newData,
@@ -520,10 +535,12 @@ const saveLoading = ref(false);
 const showSaveModal = ref(false);
 const saveFormName = ref("");
 const saveFormDescription = ref("");
+const saveFormBaseUrl = ref("");
 
 function openSaveModal() {
   saveFormName.value = stateMachineId.value ? stateMachineName.value || "未命名状态机" : "未命名状态机";
   saveFormDescription.value = stateMachineDescription.value;
+  saveFormBaseUrl.value = stateMachineBaseUrl.value;
   showSaveModal.value = true;
 }
 
@@ -533,27 +550,28 @@ async function doSaveConfirm() {
     message.warning("请输入流程图名称");
     return;
   }
+  const description = saveFormDescription.value.trim();
+  let id = stateMachineId.value;
+  const isNew = !id;
   saveLoading.value = true;
   try {
-    let id = stateMachineId.value;
-    const description = saveFormDescription.value.trim();
     if (!id) {
       const created = await createStateMachine({ name, description: description || undefined });
       id = created.id;
-      await saveFlow(id, { nodes: nodes.value, edges: edges.value });
       router.replace(`/state-machines/design/${id}`);
-      stateMachineName.value = name;
-      stateMachineDescription.value = description;
-      showSaveModal.value = false;
-      message.success("新建并保存成功");
     } else {
-      await updateStateMachine(id, { name, description: description || undefined });
-      await saveFlow(id, { nodes: nodes.value, edges: edges.value });
-      stateMachineName.value = name;
-      stateMachineDescription.value = description;
-      showSaveModal.value = false;
-      message.success("保存成功");
+      await updateStateMachine(id, {
+        name,
+        description: description || undefined,
+        baseUrl: saveFormBaseUrl.value.trim() || undefined,
+      });
     }
+    await saveFlow(id, { nodes: nodes.value, edges: edges.value });
+    stateMachineName.value = name;
+    stateMachineDescription.value = description;
+    stateMachineBaseUrl.value = saveFormBaseUrl.value.trim();
+    showSaveModal.value = false;
+    message.success(isNew ? "新建并保存成功" : "保存成功");
   } catch (e) {
     message.error(e instanceof Error ? e.message : "保存失败");
   } finally {
@@ -569,6 +587,7 @@ onMounted(async () => {
       ...n,
       class: n.class || getNodeClass(n.data as FlowNodeData),
     }));
+    console.log(nodes.value);
     edges.value = data.edges;
   } catch {
     nodes.value = [];
@@ -586,9 +605,11 @@ onMounted(async () => {
       const detail = await getStateMachineById(id);
       stateMachineName.value = detail.name ?? "";
       stateMachineDescription.value = detail.description ?? "";
+      stateMachineBaseUrl.value = detail.baseUrl ?? "";
     } catch {
       stateMachineName.value = "";
       stateMachineDescription.value = "";
+      stateMachineBaseUrl.value = "";
     }
   }
 });
@@ -756,14 +777,6 @@ onUnmounted(() => {
             </n-icon>
           </template>
         </n-button>
-        <n-button circle @click="dark = !dark" title="切换深色/浅色">
-          <template #icon>
-            <n-icon>
-              <Moon v-if="dark" />
-              <Sunny v-else />
-            </n-icon>
-          </template>
-        </n-button>
       </div>
 
       <!-- 保存流程图对话框 -->
@@ -789,6 +802,13 @@ onUnmounted(() => {
               type="textarea"
               placeholder="请输入描述（选填）"
               :autosize="{ minRows: 2, maxRows: 6 }"
+              clearable
+            />
+          </n-form-item>
+          <n-form-item label="Base URL">
+            <n-input
+              v-model:value="saveFormBaseUrl"
+              placeholder="请求基础地址，与节点请求路径拼接（选填）"
               clearable
             />
           </n-form-item>
@@ -835,8 +855,36 @@ onUnmounted(() => {
               </n-form-item>
             </template>
 
+            <!-- 请求配置（不包含 base_url） -->
+            <n-divider title-placement="left" style="margin: 12px 0; font-size: 12px; color: #999">
+              请求配置
+            </n-divider>
+            <n-form-item label="请求路径" path="requestPath">
+              <n-input
+                v-model:value="editFormModel.requestPath"
+                placeholder="如 /api/scene/enter，不含 base_url"
+                clearable
+              />
+            </n-form-item>
+            <n-form-item label="请求方法" path="requestMethod">
+              <n-input
+                v-model:value="editFormModel.requestMethod"
+                placeholder="如 GET、POST"
+                clearable
+              />
+            </n-form-item>
+            <n-form-item label="请求体/参数" path="requestData">
+              <n-input
+                v-model:value="editFormModel.requestData"
+                type="textarea"
+                placeholder="JSON 或其它请求参数（选填）"
+                :autosize="{ minRows: 2, maxRows: 6 }"
+                clearable
+              />
+            </n-form-item>
+
             <!-- 选择节点 -->
-            <template v-else-if="editFormModel.nodeCategory === 'choice'">
+            <template v-if="editFormModel.nodeCategory === 'choice'">
               <n-form-item label="选项个数">
                 <n-input-number
                   :value="editFormModel.outputCount"
@@ -871,7 +919,7 @@ onUnmounted(() => {
             </template>
 
             <!-- 结果节点 -->
-            <template v-else-if="editFormModel.nodeCategory === 'result'">
+            <template v-if="editFormModel.nodeCategory === 'result'">
               <n-form-item label="结果数量">
                 <n-input-number
                   :value="editFormModel.inputCount"

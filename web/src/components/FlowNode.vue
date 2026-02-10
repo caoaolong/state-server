@@ -2,7 +2,7 @@
 import { watch, computed } from "vue";
 import { Handle, Position, type NodeProps } from "@vue-flow/core";
 import { NodeToolbar } from "@vue-flow/node-toolbar";
-import { NCard, NIcon, NButton } from "naive-ui";
+import { NCard, NIcon, NButton, NSpace } from "naive-ui";
 import {
   PlayCircle,
   PauseCircle,
@@ -40,6 +40,12 @@ export interface FlowNodeData {
   description?: string;
   options?: Array<{ label: string; description: string }>;
   results?: Array<{ label: string; description: string }>;
+  /** 请求地址（不包含 base_url） */
+  requestPath?: string;
+  /** 请求方法，如 GET/POST */
+  requestMethod?: string;
+  /** 请求体/参数（如 JSON 字符串） */
+  requestData?: string;
   isRunning?: boolean;
   nodeState?: Exclude<NodeState, "normal"> | null;
   onRun?: () => void;
@@ -127,6 +133,10 @@ function onEdit() {
 }
 function onDelete() {
   emit("delete", props.id);
+}
+
+function onRun() {
+  props.data?.onRun?.();
 }
 </script>
 
@@ -246,11 +256,26 @@ function onDelete() {
       <template #footer>
         <div class="flow-node__footer" :class="{ 'flow-node__footer--between': isFormNode }">
           <span v-if="isFormNode" class="flow-node__footer-label" :title="data?.label">{{ data?.label }}</span>
-          <n-button quaternary circle size="small" title="日志">
-            <template #icon>
-              <n-icon :component="DocumentTextOutline" />
-            </template>
-          </n-button>
+          <n-space :size="4">
+            <n-button
+              v-if="data?.onRun"
+              quaternary
+              circle
+              size="small"
+              title="运行"
+              type="primary"
+              @click.stop="onRun"
+            >
+              <template #icon>
+                <n-icon :component="PlayCircle" />
+              </template>
+            </n-button>
+            <n-button quaternary circle size="small" title="日志">
+              <template #icon>
+                <n-icon :component="DocumentTextOutline" />
+              </template>
+            </n-button>
+          </n-space>
         </div>
       </template>
     </n-card>

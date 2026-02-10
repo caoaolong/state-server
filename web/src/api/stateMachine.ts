@@ -6,6 +6,7 @@ export interface StateMachineListItem {
   id: string;
   name: string;
   description: string;
+  baseUrl?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -53,6 +54,7 @@ export interface StateMachineCreateResponse {
 export interface StateMachineUpdateRequest {
   name?: string;
   description?: string;
+  baseUrl?: string;
   flowData?: FlowData;
 }
 
@@ -61,6 +63,7 @@ export interface StateMachineUpdateResponse {
   id: string;
   name: string;
   description: string;
+  baseUrl?: string;
   updatedAt: string;
 }
 

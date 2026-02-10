@@ -41,18 +41,14 @@ type edgePayload struct {
 	Target string `json:"target"`
 }
 
-// 列表/详情返回用
+// 列表/详情返回用（BaseURL 对应前端 baseUrl）
 type stateMachineListItem struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	BaseURL     string `json:"baseUrl"`
 	CreatedAt   string `json:"createdAt"`
 	UpdatedAt   string `json:"updatedAt"`
-}
-
-type flowDataResp struct {
-	Nodes []map[string]any `json:"nodes"`
-	Edges []map[string]any `json:"edges"`
 }
 
 func RegisterStateMachineRoutes(r *gin.Engine) {
@@ -90,6 +86,7 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 				ID:          strconv.FormatInt(row.ID, 10),
 				Name:        row.Name,
 				Description: row.Description,
+				BaseURL:     row.BaseURL,
 				CreatedAt:   row.CreatedAt.Format("2006-01-02T15:04:05.000Z07:00"),
 				UpdatedAt:   row.UpdatedAt.Format("2006-01-02T15:04:05.000Z07:00"),
 			})
@@ -118,6 +115,23 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 		})
 	})
 
+	// 获取状态机流程数据（必须写在 GET /:id 之前，否则 /123/flow 会被 /:id 匹配成 id=123/flow）
+	g.GET("/:id/flow", func(ctx *gin.Context) {
+		idStr := ctx.Param("id")
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "无效的 id"})
+			return
+		}
+		var flow orm.SMFlow
+		if err := db.First(&flow, id).Error; err != nil {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "状态机不存在"})
+			return
+		}
+		nodes, edges := loadFlowData(db, id)
+		ctx.JSON(http.StatusOK, gin.H{"nodes": nodes, "edges": edges})
+	})
+
 	// 获取单个状态机详情（含流程数据）
 	g.GET("/:id", func(ctx *gin.Context) {
 		idStr := ctx.Param("id")
@@ -136,27 +150,11 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 			"id":          strconv.FormatInt(flow.ID, 10),
 			"name":        flow.Name,
 			"description": flow.Description,
+			"baseUrl":     flow.BaseURL,
 			"createdAt":   flow.CreatedAt.Format("2006-01-02T15:04:05.000Z07:00"),
 			"updatedAt":   flow.UpdatedAt.Format("2006-01-02T15:04:05.000Z07:00"),
 			"flowData":    gin.H{"nodes": nodes, "edges": edges},
 		})
-	})
-
-	// 获取状态机流程数据
-	g.GET("/:id/flow", func(ctx *gin.Context) {
-		idStr := ctx.Param("id")
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "无效的 id"})
-			return
-		}
-		var flow orm.SMFlow
-		if err := db.First(&flow, id).Error; err != nil {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": "状态机不存在"})
-			return
-		}
-		nodes, edges := loadFlowData(db, id)
-		ctx.JSON(http.StatusOK, gin.H{"nodes": nodes, "edges": edges})
 	})
 
 	// 保存流程 PUT /state-machines/:id/flow
@@ -190,13 +188,13 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 				tx.Rollback()
 			}
 		}()
-		// 删除该状态机下原有节点与边（硬删，便于简单实现；如需保留历史可改为软删）
-		if err := tx.Where("sm_id = ?", id).Delete(&orm.SMNode{}).Error; err != nil {
+		// 物理删除该状态机下原有节点与边，再重新插入（避免软删导致表内记录只增不减）
+		if err := tx.Unscoped().Where("sm_id = ?", id).Delete(&orm.SMNode{}).Error; err != nil {
 			tx.Rollback()
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		if err := tx.Where("sm_id = ?", id).Delete(&orm.SMEdge{}).Error; err != nil {
+		if err := tx.Unscoped().Where("sm_id = ?", id).Delete(&orm.SMEdge{}).Error; err != nil {
 			tx.Rollback()
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -208,12 +206,16 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 			if len(storeBytes) <= 2 {
 				storeBytes = []byte("{}")
 			}
+			reqPath, reqMethod, reqData := getRequestFieldsFromData(n.Data)
 			node := orm.SMNode{
-				SMID:   id,
-				NodeID: n.ID,
-				Type:   n.Type,
-				Label:  getLabelFromData(n.Data),
-				Data:   string(storeBytes),
+				SMID:          id,
+				NodeID:        n.ID,
+				Type:          n.Type,
+				Label:         getLabelFromData(n.Data),
+				Data:          string(storeBytes),
+				RequestPath:   reqPath,
+				RequestMethod: reqMethod,
+				RequestData:   reqData,
 			}
 			if node.Type == "" {
 				node.Type = "default"
@@ -274,6 +276,7 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 		var req struct {
 			Name        *string `json:"name"`
 			Description *string `json:"description"`
+			BaseURL     *string `json:"baseUrl"`
 		}
 		if err := ctx.ShouldBindJSON(&req); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "请求体格式错误"})
@@ -286,6 +289,9 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 		if req.Description != nil {
 			updates["description"] = *req.Description
 		}
+		if req.BaseURL != nil {
+			updates["base_url"] = *req.BaseURL
+		}
 		if len(updates) > 0 {
 			if err := db.Model(&flow).Updates(updates).Error; err != nil {
 				ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -297,6 +303,7 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 			"id":          strconv.FormatInt(flow.ID, 10),
 			"name":        flow.Name,
 			"description": flow.Description,
+			"baseUrl":     flow.BaseURL,
 			"updatedAt":   flow.UpdatedAt.Format("2006-01-02T15:04:05.000Z07:00"),
 		})
 	})
@@ -340,11 +347,24 @@ func loadFlowData(db *gorm.DB, smID int64) (nodes []map[string]any, edges []map[
 		if data == nil {
 			data = map[string]any{"label": r.Label}
 		}
+		dataObj, _ := data.(map[string]any)
+		if dataObj == nil {
+			dataObj = map[string]any{"label": r.Label}
+		}
+		if r.RequestPath != "" {
+			dataObj["requestPath"] = r.RequestPath
+		}
+		if r.RequestMethod != "" {
+			dataObj["requestMethod"] = r.RequestMethod
+		}
+		if r.RequestData != "" {
+			dataObj["requestData"] = r.RequestData
+		}
 		nodes = append(nodes, map[string]any{
 			"id":       r.NodeID,
 			"type":     r.Type,
 			"position": position,
-			"data":     data,
+			"data":     dataObj,
 		})
 	}
 	var edgeRows []orm.SMEdge
@@ -370,4 +390,22 @@ func getLabelFromData(data json.RawMessage) string {
 		return l
 	}
 	return ""
+}
+
+// getRequestFieldsFromData 从 data JSON 中取出 requestPath、requestMethod、requestData
+func getRequestFieldsFromData(data json.RawMessage) (path, method, dataStr string) {
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		return "", "", ""
+	}
+	if p, ok := m["requestPath"].(string); ok {
+		path = p
+	}
+	if mth, ok := m["requestMethod"].(string); ok {
+		method = mth
+	}
+	if d, ok := m["requestData"].(string); ok {
+		dataStr = d
+	}
+	return path, method, dataStr
 }

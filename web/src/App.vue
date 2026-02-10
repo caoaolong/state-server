@@ -3,6 +3,7 @@ import { h, ref, computed, provide, watch, onMounted, onUnmounted, type Componen
 import { useRouter, useRoute } from "vue-router";
 import { NConfigProvider, NMessageProvider, darkTheme, zhCN, dateZhCN, NLayout, NLayoutSider, NLayoutContent, NMenu, NIcon, type MenuOption } from "naive-ui";
 import { BookOutline, DocumentTextOutline, SettingsOutline, ShareSocialOutline } from "@vicons/ionicons5";
+import type { ThemeOption } from "./api/settings";
 
 const router = useRouter();
 const route = useRoute();
@@ -11,14 +12,25 @@ function renderIcon(icon: Component) {
   return () => h(NIcon, null, { default: () => h(icon) });
 }
 
-// Global Theme Management
-const dark = ref(window.matchMedia("(prefers-color-scheme: dark)").matches);
+// 主题：由设置页控制，持久化到 localStorage
+const THEME_STORAGE_KEY = "app-theme";
+
+const themeOption = ref<ThemeOption>(
+  (localStorage.getItem(THEME_STORAGE_KEY) as ThemeOption) ?? "auto"
+);
+const systemDark = ref(window.matchMedia("(prefers-color-scheme: dark)").matches);
+const dark = computed(
+  () =>
+    themeOption.value === "dark" ? true : themeOption.value === "light" ? false : systemDark.value
+);
 const theme = computed(() => (dark.value ? darkTheme : null));
 provide("app-dark-mode", dark);
+provide("app-theme-option", themeOption);
+provide("app-theme-storage-key", THEME_STORAGE_KEY);
 
 const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 const handleThemeChange = (e: MediaQueryListEvent) => {
-  dark.value = e.matches;
+  systemDark.value = e.matches;
 };
 
 onMounted(() => {
