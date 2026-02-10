@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import type { Node, Edge } from "@vue-flow/core";
 import { http } from "./request";
 

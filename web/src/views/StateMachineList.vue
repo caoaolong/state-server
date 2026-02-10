@@ -20,12 +20,11 @@ const columns: DataTableColumns<StateMachineListItem> = [
   {
     title: "操作",
     key: "actions",
-    width: 220,
+    width: 180,
     render(_row) {
       return h(NSpace, null, {
         default: () => [
           h(NButton, { quaternary: true, size: "small", type: "primary", onClick: () => router.push(`/state-machines/design/${_row.id}`) }, () => "设计"),
-          h(NButton, { quaternary: true, size: "small" }, () => "查看"),
           h(NButton, { quaternary: true, size: "small", type: "error", loading: deletingId.value === _row.id, onClick: () => handleDelete(_row) }, () => "删除"),
         ],
       });

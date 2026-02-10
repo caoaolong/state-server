@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { watch, computed } from "vue";
+import { watch, computed, ref } from "vue";
 import { Handle, Position, type NodeProps } from "@vue-flow/core";
 import { NodeToolbar } from "@vue-flow/node-toolbar";
-import { NCard, NIcon, NButton, NSpace } from "naive-ui";
+import { NCard, NIcon, NButton, NSpace, useMessage } from "naive-ui";
 import {
   PlayCircle,
+  PlayCircleOutline,
   PauseCircle,
   CheckmarkCircle,
   CloseCircle,
   EllipseOutline,
-  DocumentTextOutline,
   CopyOutline,
   CreateOutline,
   TrashOutline,
@@ -49,6 +49,8 @@ export interface FlowNodeData {
   isRunning?: boolean;
   nodeState?: Exclude<NodeState, "normal"> | null;
   onRun?: () => void;
+  /** 运行结果 */
+  runResult?: string;
 }
 
 const STATE_CONFIG: Record<
@@ -62,7 +64,13 @@ const STATE_CONFIG: Record<
   failed: { label: "失败", icon: CloseCircle, class: "flow-node__state--failed" },
 };
 
-const props = defineProps<NodeProps<FlowNodeData>>();
+const props = withDefaults(
+  defineProps<NodeProps<FlowNodeData> & { baseUrl?: string }>(),
+  { baseUrl: "" }
+);
+
+const message = useMessage();
+const isRunning = ref(false);
 
 const stateConfig = computed(() =>
   props.data?.nodeState ? STATE_CONFIG[props.data.nodeState] : STATE_CONFIG.normal
@@ -138,6 +146,45 @@ function onDelete() {
 function onRun() {
   props.data?.onRun?.();
 }
+
+async function executeRequest() {
+  const data = props.data;
+  if (!data || !data.requestPath || !data.requestMethod || !props.baseUrl) {
+    message.error("请求配置不完整");
+    return;
+  }
+
+  isRunning.value = true;
+
+  try {
+    const url = `${props.baseUrl}${data.requestPath}`;
+    const options: RequestInit = {
+      method: data.requestMethod.toUpperCase(),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    };
+
+    if (data.requestData && data.requestMethod.toUpperCase() !== "GET") {
+      try {
+        options.body = JSON.stringify(JSON.parse(data.requestData));
+      } catch {
+        options.body = data.requestData;
+      }
+    }
+
+    const response = await fetch(url, options);
+    const responseData = await response.json();
+
+    data.runResult = JSON.stringify(responseData, null, 2);
+    message.success("请求成功");
+  } catch (error) {
+    data.runResult = `错误: ${error instanceof Error ? error.message : String(error)}`;
+    message.error("请求失败");
+  } finally {
+    isRunning.value = false;
+  }
+}
 </script>
 
 <template>
@@ -157,7 +204,7 @@ function onRun() {
         </template>
         复制
       </n-button>
-      <n-button v-if="!isStartOrEnd" quaternary size="small" title="编辑" @click.stop="onEdit">
+      <n-button quaternary size="small" title="编辑" @click.stop="onEdit">
         <template #icon>
           <n-icon :component="CreateOutline" />
         </template>
@@ -270,9 +317,18 @@ function onRun() {
                 <n-icon :component="PlayCircle" />
               </template>
             </n-button>
-            <n-button quaternary circle size="small" title="日志">
+            <!-- 自定义节点的运行按钮 -->
+            <n-button
+              v-if="(isScene || isFormNode) && data?.requestPath && data?.requestMethod && baseUrl"
+              quaternary
+              circle
+              size="small"
+              title="执行请求"
+              :loading="isRunning"
+              @click.stop="executeRequest"
+            >
               <template #icon>
-                <n-icon :component="DocumentTextOutline" />
+                <n-icon :component="PlayCircleOutline" />
               </template>
             </n-button>
           </n-space>
@@ -518,5 +574,18 @@ function onRun() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.flow-node__result {
+  margin-top: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.flow-node__result :deep(.n-code-block) {
+  background: var(--vf-node-bg, #1a192b);
+  border: 1px solid var(--vf-node-color, #999);
 }
 </style>
