@@ -22,7 +22,7 @@ import {
 export type NodeState = "normal" | "running" | "paused" | "completed" | "failed";
 
 /** 节点大类：场景、选择、结果 */
-export type NodeCategory = "scene" | "choice" | "result";
+export type NodeCategory = "scene" | "choice" | "result" | "task";
 
 /** 场景子类型：开始、结束、普通 */
 export type SceneKind = "start" | "end" | "default";
@@ -95,11 +95,15 @@ const sceneKind = computed(() => props.data?.nodeKind ?? "default");
 const isScene = computed(() => category.value === "scene");
 const isStartOrEnd = computed(() => isScene.value && (sceneKind.value === "start" || sceneKind.value === "end"));
 const isNormalScene = computed(() => isScene.value && sceneKind.value === "default");
+// 任务：一入一出，同普通场景
+const isTask = computed(() => category.value === "task");
+
 const isFormNode = computed(
   () =>
     isNormalScene.value ||
     isChoice.value ||
-    isResult.value
+    isResult.value ||
+    isTask.value
 );
 const showSceneTarget = computed(
   () => isScene.value && (sceneKind.value === "end" || sceneKind.value === "default")
@@ -240,6 +244,7 @@ async function executeRequest() {
     :class="[
       `flow-node--${category}`,
       isScene ? `flow-node--scene-${sceneKind}` : '',
+      isTask ? 'flow-node--task' : '',
     ]"
     :data-node-category="category"
     :data-node-kind="isScene ? sceneKind : undefined"
@@ -285,6 +290,13 @@ async function executeRequest() {
     <!-- 选择：左侧一个 target -->
     <Handle
       v-else-if="isChoice"
+      type="target"
+      :position="Position.Left"
+      class="flow-node__handle"
+    />
+    <!-- 任务：左侧一个 target -->
+    <Handle
+      v-else-if="isTask"
       type="target"
       :position="Position.Left"
       class="flow-node__handle"
@@ -339,6 +351,16 @@ async function executeRequest() {
               <div v-if="!data.results?.length" class="flow-node__text-empty">
                 暂无结果
               </div>
+            </div>
+          </template>
+
+          <!-- 任务节点：描述 -->
+          <template v-else-if="isTask">
+            <div class="flow-node__text-content" v-if="data.description">
+              {{ data.description }}
+            </div>
+            <div class="flow-node__text-empty" v-else>
+              暂无描述
             </div>
           </template>
         </template>
@@ -404,6 +426,13 @@ async function executeRequest() {
     <!-- 结果：右侧一个 source -->
     <Handle
       v-else-if="isResult"
+      type="source"
+      :position="Position.Right"
+      class="flow-node__handle"
+    />
+    <!-- 任务：右侧一个 source -->
+    <Handle
+      v-else-if="isTask"
       type="source"
       :position="Position.Right"
       class="flow-node__handle"
@@ -579,6 +608,13 @@ async function executeRequest() {
 .flow-node--result .flow-node__handle {
   border-color: #7c3aed;
   color: #7c3aed;
+}
+
+/* 任务：青色系，一入一出 */
+.flow-node--task .flow-node__card :deep(.n-card-header),
+.flow-node--task .flow-node__handle {
+  border-color: #0d9488;
+  color: #0d9488;
 }
 
 .flow-node__text-content {

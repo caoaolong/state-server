@@ -18,7 +18,7 @@ export interface EditFormModel {
 }
 
 /** 添加节点菜单选项 key（工具栏/右键菜单统一） */
-export type AddNodeOptionKey = "scene-start" | "scene-end" | "scene-default" | "choice" | "result";
+export type AddNodeOptionKey = "scene-start" | "scene-end" | "scene-default" | "choice" | "result" | "task";
 
 export const ADD_NODE_KEYS: AddNodeOptionKey[] = [
 	"scene-start",
@@ -26,6 +26,7 @@ export const ADD_NODE_KEYS: AddNodeOptionKey[] = [
 	"scene-default",
 	"choice",
 	"result",
+	"task",
 ];
 
 export function isAddNodeOptionKey(key: string): key is AddNodeOptionKey {

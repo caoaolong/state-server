@@ -171,7 +171,7 @@ function onEdgesChange(changes: EdgeChange[]) {
 }
 
 // ---------- 节点 CRUD ----------
-const idCounters = ref({ sceneStart: 0, sceneEnd: 0, sceneDefault: 0, choice: 0, result: 0 });
+const idCounters = ref({ sceneStart: 0, sceneEnd: 0, sceneDefault: 0, choice: 0, result: 0, task: 0 });
 const DEFAULT_ADD_POSITION = { x: 200, y: 150 };
 
 function nextId(kind: keyof typeof idCounters.value): string {
@@ -182,7 +182,8 @@ function nextId(kind: keyof typeof idCounters.value): string {
 		: kind === "sceneEnd" ? "scene-end"
 		: kind === "sceneDefault" ? "scene"
 		: kind === "choice" ? "choice"
-		: "result";
+		: kind === "result" ? "result"
+		: "task";
 	return `${prefix}-${n}`;
 }
 
@@ -199,12 +200,13 @@ function getNodeClass(data: FlowNodeData | undefined): string {
 	if (cat === "scene") return `flow-type-scene flow-type-scene-${kind ?? "default"}`;
 	if (cat === "choice") return "flow-type-choice";
 	if (cat === "result") return "flow-type-result";
+	if (cat === "task") return "flow-type-task";
 	return "";
 }
 
 function addNodeAt(
 	position: { x: number; y: number },
-	option: "scene-start" | "scene-end" | "scene-default" | "choice" | "result"
+	option: import("../types/flow").AddNodeOptionKey
 ) {
 	if (option === "scene-start" && hasNodeKind("start")) return;
 	if (option === "scene-end" && hasNodeKind("end")) return;
@@ -213,13 +215,15 @@ function addNodeAt(
 		: option === "scene-end" ? nextId("sceneEnd")
 		: option === "scene-default" ? nextId("sceneDefault")
 		: option === "choice" ? nextId("choice")
-		: nextId("result");
-	const labels: Record<typeof option, string> = {
+		: option === "result" ? nextId("result")
+		: nextId("task");
+	const labels: Record<string, string> = {
 		"scene-start": "开始",
 		"scene-end": "结束",
 		"scene-default": "普通场景",
 		choice: "选择",
 		result: "结果",
+		task: "任务",
 	};
 	let data: FlowNodeData;
 	let nodeClass: string;
@@ -238,7 +242,7 @@ function addNodeAt(
 			],
 		};
 		nodeClass = "flow-type-choice";
-	} else {
+	} else if (option === "result") {
 		data = {
 			label: labels.result,
 			nodeCategory: "result",
@@ -249,6 +253,9 @@ function addNodeAt(
 			],
 		};
 		nodeClass = "flow-type-result";
+	} else {
+		data = { label: labels.task, nodeCategory: "task", description: "" };
+		nodeClass = "flow-type-task";
 	}
 	const newNode: Node = { id, type: "flow", position, data, class: nodeClass };
 	nodes.value = [...nodes.value, newNode];
@@ -326,7 +333,7 @@ function onNodeCopy(nodeId: string) {
 	const kind =
 		category === "scene"
 			? data?.nodeKind === "start" ? "sceneStart" : data?.nodeKind === "end" ? "sceneEnd" : "sceneDefault"
-			: category === "choice" ? "choice" : "result";
+			: category === "choice" ? "choice" : category === "result" ? "result" : "task";
 	const newId = nextId(kind);
 	const pos = node.position ?? { x: 0, y: 0 };
 	const newNode: Node = {
@@ -454,6 +461,8 @@ async function handleEditSave() {
 		} else if (editFormModel.value.nodeCategory === "result") {
 			newData.inputCount = editFormModel.value.inputCount;
 			newData.results = JSON.parse(JSON.stringify(editFormModel.value.results));
+		} else if (editFormModel.value.nodeCategory === "task") {
+			newData.description = editFormModel.value.description;
 		}
 		return { ...n, data: newData };
 	});
@@ -499,12 +508,14 @@ const addNodeOptions = computed<DropdownOption[]>(() => [
 	{ label: "添加场景", key: "scene", type: "group", children: sceneMenuChildren.value },
 	{ label: "添加选择", key: "choice" },
 	{ label: "添加结果", key: "result" },
+	{ label: "添加任务", key: "task" },
 ]);
 
 const contextMenuOptions = computed<MenuOption[]>(() => [
 	{ label: "添加场景", key: "scene", children: sceneMenuChildren.value },
 	{ label: "添加选择", key: "choice" },
 	{ label: "添加结果", key: "result" },
+	{ label: "添加任务", key: "task" },
 ]);
 
 // ---------- 测试运行 ----------
@@ -567,7 +578,7 @@ function startTestRun() {
 function isFormNodeWithRun(data: FlowNodeData): boolean {
 	if (!data?.nodeCategory) return false;
 	if (data.nodeCategory === "scene" && data.nodeKind === "default") return true;
-	if (data.nodeCategory === "choice" || data.nodeCategory === "result") return true;
+	if (data.nodeCategory === "choice" || data.nodeCategory === "result" || data.nodeCategory === "task") return true;
 	return false;
 }
 
@@ -802,6 +813,11 @@ onUnmounted(() => {
 										<n-input v-model:value="editFormModel.label" placeholder="请输入节点显示内容" />
 									</n-form-item>
 									<template v-if="editFormModel.nodeCategory === 'scene'">
+										<n-form-item label="描述" path="description">
+											<n-input v-model:value="editFormModel.description" type="textarea" placeholder="请输入描述" :autosize="{ minRows: 2, maxRows: 6 }" />
+										</n-form-item>
+									</template>
+									<template v-if="editFormModel.nodeCategory === 'task'">
 										<n-form-item label="描述" path="description">
 											<n-input v-model:value="editFormModel.description" type="textarea" placeholder="请输入描述" :autosize="{ minRows: 2, maxRows: 6 }" />
 										</n-form-item>

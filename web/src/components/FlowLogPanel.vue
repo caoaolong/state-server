@@ -24,7 +24,7 @@ defineProps<{
 			<div class="flow-log-panel__node-header">
 				<span class="flow-log-panel__node-label">{{ selectionNode.data?.label ?? "未命名节点" }}</span>
 				<n-tag v-if="selectionNode.data?.nodeCategory" size="small" :bordered="false" type="info">
-					{{ selectionNode.data.nodeCategory === "scene" ? "场景" : selectionNode.data.nodeCategory === "choice" ? "选择" : "结果" }}
+					{{ selectionNode.data.nodeCategory === "scene" ? "场景" : selectionNode.data.nodeCategory === "choice" ? "选择" : selectionNode.data.nodeCategory === "result" ? "结果" : "任务" }}
 				</n-tag>
 			</div>
 
