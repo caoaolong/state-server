@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourname/state-monitor/orm"
+	"github.com/caoaolong/state-server/orm"
 	"gorm.io/gorm"
 )
 
@@ -52,7 +52,7 @@ type stateMachineListItem struct {
 }
 
 func RegisterStateMachineRoutes(r *gin.Engine) {
-	g := r.Group("/state-machines")
+	g := r.Group("/flow")
 	db := orm.DB()
 
 	// 获取状态机列表
@@ -94,16 +94,28 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 		ctx.JSON(http.StatusOK, gin.H{"list": items, "total": total})
 	})
 
-	// 创建状态机
+	// 创建状态机（事务）
 	g.POST("", func(ctx *gin.Context) {
 		var req createStateMachineReq
 		if err := ctx.ShouldBindJSON(&req); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "参数错误: " + err.Error()})
 			return
 		}
+		tx := db.Begin()
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+			}
+		}()
 		row := orm.SMFlow{Name: req.Name, Description: req.Description}
-		if err := db.Create(&row).Error; err != nil {
+		if err := tx.Create(&row).Error; err != nil {
+			tx.Rollback()
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if err := tx.Commit().Error; err != nil {
+			tx.Rollback()
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "提交事务失败: " + err.Error()})
 			return
 		}
 		ctx.JSON(http.StatusOK, gin.H{
@@ -157,7 +169,7 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 		})
 	})
 
-	// 保存流程 PUT /state-machines/:id/flow
+	// 保存流程 PUT /flow/:id/flow
 	g.PUT("/:id/flow", func(ctx *gin.Context) {
 		idStr := ctx.Param("id")
 		id, err := strconv.ParseInt(idStr, 10, 64)
@@ -308,7 +320,7 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 		})
 	})
 
-	// 删除状态机
+	// 删除状态机（事务）
 	g.DELETE("/:id", func(ctx *gin.Context) {
 		idStr := ctx.Param("id")
 		id, err := strconv.ParseInt(idStr, 10, 64)
@@ -316,13 +328,26 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "无效的 id"})
 			return
 		}
-		result := db.Delete(&orm.SMFlow{}, id)
+		tx := db.Begin()
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+			}
+		}()
+		result := tx.Delete(&orm.SMFlow{}, id)
 		if result.Error != nil {
+			tx.Rollback()
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 			return
 		}
 		if result.RowsAffected == 0 {
+			tx.Rollback()
 			ctx.JSON(http.StatusNotFound, gin.H{"error": "状态机不存在"})
+			return
+		}
+		if err := tx.Commit().Error; err != nil {
+			tx.Rollback()
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "提交事务失败: " + err.Error()})
 			return
 		}
 		ctx.Status(http.StatusNoContent)

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, ref, computed, provide, watch, onMounted, onUnmounted, type Component } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { NConfigProvider, NMessageProvider, darkTheme, zhCN, dateZhCN, NLayout, NLayoutSider, NLayoutContent, NMenu, NIcon, type MenuOption } from "naive-ui";
+import { NConfigProvider, NMessageProvider, NDialogProvider, darkTheme, zhCN, dateZhCN, NLayout, NLayoutSider, NLayoutContent, NMenu, NIcon, type MenuOption } from "naive-ui";
 import { BookOutline, DocumentTextOutline, SettingsOutline, ShareSocialOutline } from "@vicons/ionicons5";
 import type { ThemeOption } from "./api/settings";
 
@@ -47,8 +47,8 @@ const menuOptions: MenuOption[] = [
     key: "state-machines",
     icon: renderIcon(ShareSocialOutline),
     children: [
-      { label: "列表", key: "/state-machines/list" },
-      { label: "设计", key: "/state-machines/design" },
+      { label: "列表", key: "/flow/list" },
+      { label: "设计", key: "/flow/design" },
     ],
   },
   {
@@ -79,7 +79,7 @@ watch(
   () => route.path,
   (path) => {
     const keys: string[] = [];
-    if (path.startsWith("/state-machines")) keys.push("state-machines");
+    if (path.startsWith("/flow")) keys.push("state-machines");
     if (path.startsWith("/sessions")) keys.push("sessions");
     expandedKeys.value = keys;
   },
@@ -96,6 +96,7 @@ const collapsed = ref(false);
 <template>
   <n-config-provider :theme="theme" :locale="zhCN" :date-locale="dateZhCN" class="app-provider">
     <n-message-provider>
+      <n-dialog-provider>
       <n-layout has-sider class="main-layout">
       <n-layout-sider
         bordered
@@ -121,6 +122,7 @@ const collapsed = ref(false);
         <router-view />
       </n-layout-content>
     </n-layout>
+      </n-dialog-provider>
     </n-message-provider>
   </n-config-provider>
 </template>

@@ -9,7 +9,7 @@ export {
   getApiKey,
   getApiKeys,
 } from "./request";
-export * from "./stateMachine";
+export * from "./flow";
 export * from "./session";
 export * from "./settings";
 export * from "./apikey";

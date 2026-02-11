@@ -60,26 +60,28 @@ type SMEdge struct {
 
 // SessionInfo 会话主表：关联状态机，当前状态与运行状态
 type SessionInfo struct {
-	ID        int64          `gorm:"primaryKey"`
-	SMID      int64          `gorm:"not null;index"`
-	State     string         `gorm:"not null;default:''"`      // 当前所处状态（节点/状态名）
-	Status    string         `gorm:"not null;default:running"` // running | ended | suspended
-	DeletedAt gorm.DeletedAt `gorm:"index"`
-	CreatedAt time.Time      `gorm:"autoCreateTime:nano"`
-	UpdatedAt time.Time      `gorm:"autoUpdateTime:nano"`
+	ID               int64          `gorm:"primaryKey"`
+	SMID             int64          `gorm:"not null;index:idx_sm_logical,unique"`
+	LogicalSessionID int64          `gorm:"not null;default:0;index:idx_sm_logical,unique"` // 逻辑会话 id，0 表示设计页会话
+	State            string         `gorm:"not null;default:''"`                             // 当前所处状态（节点/状态名）
+	Status           string         `gorm:"not null;default:running"`                        // running | ended | suspended
+	DeletedAt        gorm.DeletedAt `gorm:"index"`
+	CreatedAt        time.Time      `gorm:"autoCreateTime:nano"`
+	UpdatedAt        time.Time      `gorm:"autoUpdateTime:nano"`
 }
 
-// SessionDetail 会话历史明细：一次状态迁移记录（事件、原状态、目标状态、请求与响应）
+// SessionDetail 会话历史明细：一次状态迁移记录（按 session+node 存在则更新）
 type SessionDetail struct {
 	ID           int64          `gorm:"primaryKey"`
-	SessionID    int64          `gorm:"not null;index"`
+	SessionID    int64          `gorm:"not null;index:idx_session_node,unique"`
+	NodeID       string         `gorm:"not null;size:128;index:idx_session_node,unique"` // 节点 id，与 session 确定唯一
 	SMID         int64          `gorm:"not null"`
 	Event        string         `gorm:"not null;default:''"`
 	FromState    string         `gorm:"not null;default:''"`
 	ToState      string         `gorm:"not null;default:''"`
-	Path         string         `gorm:"default:''"`           // 请求路径
-	RequestData  string         `gorm:"type:text;default:''"` // 请求数据（如 JSON）
-	ResponseData string         `gorm:"type:text;default:''"` // 响应数据（如 JSON）
+	Path         string         `gorm:"default:''"`            // 请求路径
+	RequestData  string         `gorm:"type:text;default:''"`  // 请求数据（如 JSON）
+	ResponseData string         `gorm:"type:text;default:''"`  // 响应数据（如 JSON）
 	Input        string         `gorm:"default:''"`
 	Output       string         `gorm:"default:''"`
 	DeletedAt    gorm.DeletedAt `gorm:"index"`

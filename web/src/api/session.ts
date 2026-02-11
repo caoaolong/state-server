@@ -52,6 +52,31 @@ import { http } from "./request";
 const BASE = import.meta.env.VITE_API_BASE ?? "";
 
 /**
+ * 创建会话（设计页进入时调用，sessionId 固定为 0）
+ * POST /sessions  body: { stateMachineId, sessionId: 0 }
+ */
+export interface CreateSessionRequest {
+  stateMachineId: string;
+  sessionId?: number;
+}
+
+export interface CreateSessionResponse {
+  id: string;
+  sessionId: number;
+  stateMachineId: string;
+  status: SessionStatus;
+  createdAt: string;
+}
+
+export async function createSession(req: CreateSessionRequest): Promise<CreateSessionResponse> {
+  return http<CreateSessionResponse>({
+    method: "POST",
+    url: `${BASE}/sessions`,
+    body: { stateMachineId: req.stateMachineId, sessionId: req.sessionId ?? 0 },
+  });
+}
+
+/**
  * 获取会话列表
  * GET /sessions?page=1&pageSize=10&stateMachineId=xxx&status=running
  */

@@ -1,4 +1,4 @@
-module github.com/yourname/state-monitor
+module github.com/caoaolong/state-server
 
 go 1.25.6
 
