@@ -6,6 +6,7 @@ import { http } from "./request";
 export interface StateMachineListItem {
   id: string;
   name: string;
+	identifier: string;
   description: string;
   baseUrl?: string;
   createdAt: string;
@@ -56,6 +57,7 @@ export interface StateMachineUpdateRequest {
   name?: string;
   description?: string;
   baseUrl?: string;
+	identifier?: string;
   flowData?: FlowData;
 }
 

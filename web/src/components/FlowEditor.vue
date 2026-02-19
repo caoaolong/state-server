@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick, inject } from "vue";
+import { ref, onMounted, onUnmounted, computed, nextTick, inject, reactive } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { type Node, type Edge, type Connection, type NodeChange, type EdgeChange, useVueFlow } from "@vue-flow/core";
 import { VueFlow } from "@vue-flow/core";
@@ -18,14 +18,30 @@ const router = useRouter();
 const message = useMessage();
 const dark = inject('app-dark-mode', ref(false));
 
-/** 当前编辑的状态机 ID（来自路由 /state-machines/design/:id），无则为新建 */
+/** 状态机信息对象 */
+interface StateMachineInfo {
+  /** 状态机 ID（来自路由 /state-machines/design/:id），无则为新建 */
+  id: string | undefined;
+  /** 状态机名称（编辑时从接口加载，用于保存对话框预填） */
+  name: string;
+  /** 状态机描述（编辑时从接口加载，用于保存对话框预填） */
+  description: string;
+  /** 状态机 baseUrl（请求基础地址，与节点请求路径拼接） */
+  baseUrl: string;
+  /** 状态机标识符（用于唯一识别状态机） */
+  identifier: string;
+}
+
+const stateMachineInfo = reactive<StateMachineInfo>({
+  id: undefined,
+  name: "",
+  description: "",
+  baseUrl: "",
+  identifier: "",
+});
+
+/** 当前编辑的状态机 ID（来自路由 /state-machines/design/:id），无则为新建 - 计算属性 */
 const stateMachineId = computed(() => route.params.id as string | undefined);
-/** 当前状态机名称（编辑时从接口加载，用于保存对话框预填） */
-const stateMachineName = ref("");
-/** 当前状态机描述（编辑时从接口加载，用于保存对话框预填） */
-const stateMachineDescription = ref("");
-/** 当前状态机 baseUrl（请求基础地址，与节点请求路径拼接） */
-const stateMachineBaseUrl = ref("");
 
 const nodes = ref<Node[]>([]);
 const edges = ref<Edge[]>([]);
@@ -549,44 +565,43 @@ const displayNodes = computed(() => {
 
 const saveLoading = ref(false);
 const showSaveModal = ref(false);
-const saveFormName = ref("");
-const saveFormDescription = ref("");
-const saveFormBaseUrl = ref("");
 
 function openSaveModal() {
-	saveFormName.value = stateMachineId.value ? stateMachineName.value || "未命名状态机" : "未命名状态机";
-	saveFormDescription.value = stateMachineDescription.value;
-	saveFormBaseUrl.value = stateMachineBaseUrl.value;
+	if (!stateMachineInfo.name) {
+		stateMachineInfo.name = "未命名状态机";
+	}
 	showSaveModal.value = true;
 }
 
 async function doSaveConfirm() {
-	const name = saveFormName.value.trim();
+	const name = stateMachineInfo.name.trim();
 	if (!name) {
 		message.warning("请输入流程图名称");
 		return;
 	}
-	const description = saveFormDescription.value.trim();
-	let id = stateMachineId.value;
+	const description = stateMachineInfo.description.trim();
+	let id = stateMachineInfo.id;
 	const isNew = !id;
 	saveLoading.value = true;
 	try {
 		if (!id) {
 			const created = await createStateMachine({ name, description: description || undefined });
 			id = created.id;
+			stateMachineInfo.id = id;
 			router.replace(`/state-machines/design/${id}`);
 		} else {
-			console.log(saveFormBaseUrl.value);
+			const baseUrl = stateMachineInfo.baseUrl.trim();
 			await updateStateMachine(id, {
 				name,
 				description: description || undefined,
-				baseUrl: saveFormBaseUrl.value.trim() || undefined,
+				baseUrl: baseUrl || undefined,
+				identifier: stateMachineInfo.identifier.trim() || undefined,
 			});
 		}
 		await saveFlow(id, { nodes: nodes.value, edges: edges.value });
-		stateMachineName.value = name;
-		stateMachineDescription.value = description;
-		stateMachineBaseUrl.value = saveFormBaseUrl.value.trim();
+		stateMachineInfo.name = name;
+		stateMachineInfo.description = description;
+		stateMachineInfo.baseUrl = stateMachineInfo.baseUrl.trim();
 		showSaveModal.value = false;
 		message.success(isNew ? "新建并保存成功" : "保存成功");
 	} catch (e) {
@@ -620,13 +635,17 @@ onMounted(async () => {
 	if (id) {
 		try {
 			const detail = await getStateMachineById(id);
-			stateMachineName.value = detail.name ?? "";
-			stateMachineDescription.value = detail.description ?? "";
-			stateMachineBaseUrl.value = detail.baseUrl ?? "";
+			stateMachineInfo.id = detail.id;
+			stateMachineInfo.name = detail.name ?? "";
+			stateMachineInfo.description = detail.description ?? "";
+			stateMachineInfo.baseUrl = detail.baseUrl ?? "";
+			stateMachineInfo.identifier = detail.identifier; // 使用 ID 作为标识符
 		} catch {
-			stateMachineName.value = "";
-			stateMachineDescription.value = "";
-			stateMachineBaseUrl.value = "";
+			stateMachineInfo.id = undefined;
+			stateMachineInfo.name = "";
+			stateMachineInfo.description = "";
+			stateMachineInfo.baseUrl = "";
+			stateMachineInfo.identifier = "";
 		}
 	}
 });
@@ -651,7 +670,7 @@ onUnmounted(() => {
 						@edge-context-menu="onEdgeContextMenu" @node-click="onNodeClick" :nodes="displayNodes" :edges="edges"
 						:class="{ 'vue-flow-dark': dark }" :style="{ backgroundColor: dark ? '#333' : '#EEE' }">
 						<template #node-flow="flowNodeProps">
-							<FlowNode v-bind="flowNodeProps" :base-url="stateMachineBaseUrl" @copy="onNodeCopy" @edit="onNodeEdit"
+							<FlowNode v-bind="flowNodeProps" :base-url="stateMachineInfo.baseUrl" @copy="onNodeCopy" @edit="onNodeEdit"
 								@delete="onNodeDelete" />
 						</template>
 						<Background />
@@ -751,24 +770,27 @@ onUnmounted(() => {
 						<n-modal v-model:show="showSaveModal" :mask-closable="false">
 							<n-card style="width: 400px" title="保存流程图" :bordered="false" role="dialog" aria-modal="true">
 								<n-form-item label="流程图名称">
-									<n-input v-model:value="saveFormName" placeholder="请输入流程图名称" clearable
-										@keyup.enter="doSaveConfirm" />
-								</n-form-item>
-								<n-form-item label="描述">
-									<n-input v-model:value="saveFormDescription" type="textarea" placeholder="请输入描述（选填）"
-										:autosize="{ minRows: 2, maxRows: 6 }" clearable />
-								</n-form-item>
-								<n-form-item label="Base URL">
-									<n-input v-model:value="saveFormBaseUrl" placeholder="请求基础地址，与节点请求路径拼接（选填）" clearable />
-								</n-form-item>
-								<template #footer>
-									<div style="display: flex; justify-content: flex-end; gap: 8px">
-										<n-button @click="showSaveModal = false">取消</n-button>
-										<n-button type="primary" :loading="saveLoading" @click="doSaveConfirm">确定</n-button>
-									</div>
-								</template>
-							</n-card>
-						</n-modal>
+								<n-input v-model:value="stateMachineInfo.name" placeholder="请输入流程图名称" clearable
+									@keyup.enter="doSaveConfirm" />
+							</n-form-item>
+							<n-form-item label="描述">
+								<n-input v-model:value="stateMachineInfo.description" type="textarea" placeholder="请输入描述（选填）"
+									:autosize="{ minRows: 2, maxRows: 6 }" clearable />
+							</n-form-item>
+							<n-form-item label="标识符">
+								<n-input v-model:value="stateMachineInfo.identifier" placeholder="请输入标识符" clearable />
+							</n-form-item>
+							<n-form-item label="Base URL">
+								<n-input v-model:value="stateMachineInfo.baseUrl" placeholder="请求基础地址，与节点请求路径拼接（选填）" clearable />
+							</n-form-item>
+							<template #footer>
+								<div style="display: flex; justify-content: flex-end; gap: 8px">
+									<n-button @click="showSaveModal = false">取消</n-button>
+									<n-button type="primary" :loading="saveLoading" @click="doSaveConfirm">确定</n-button>
+								</div>
+							</template>
+						</n-card>
+					</n-modal>
 
 						<!-- 节点编辑模态框 -->
 						<n-modal v-model:show="showEditModal">

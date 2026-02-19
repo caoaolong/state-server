@@ -10,6 +10,7 @@ import (
 // SMFlow 状态机主表：名称、描述、base_url，流程数据在 SMNode + SMEdge
 type SMFlow struct {
 	ID          int64          `gorm:"primaryKey"`
+	Identifier  string         `gorm:"default:''"`
 	Name        string         `gorm:"not null"`
 	Description string         `gorm:"default:''"`
 	BaseURL     string         `gorm:"default:''"` // 请求基础地址，与节点请求路径拼接

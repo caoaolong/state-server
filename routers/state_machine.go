@@ -151,6 +151,7 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 			"name":        flow.Name,
 			"description": flow.Description,
 			"baseUrl":     flow.BaseURL,
+			"identifier":  flow.Identifier,
 			"createdAt":   flow.CreatedAt.Format("2006-01-02T15:04:05.000Z07:00"),
 			"updatedAt":   flow.UpdatedAt.Format("2006-01-02T15:04:05.000Z07:00"),
 			"flowData":    gin.H{"nodes": nodes, "edges": edges},
@@ -277,6 +278,7 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 			Name        *string `json:"name"`
 			Description *string `json:"description"`
 			BaseURL     *string `json:"baseUrl"`
+			Identifier  *string `json:"identifier"`
 		}
 		if err := ctx.ShouldBindJSON(&req); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "请求体格式错误"})
@@ -291,6 +293,9 @@ func RegisterStateMachineRoutes(r *gin.Engine) {
 		}
 		if req.BaseURL != nil {
 			updates["base_url"] = *req.BaseURL
+		}
+		if req.Identifier != nil {
+			updates["identifier"] = *req.Identifier
 		}
 		if len(updates) > 0 {
 			if err := db.Model(&flow).Updates(updates).Error; err != nil {

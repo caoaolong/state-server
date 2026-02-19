@@ -5,6 +5,7 @@ import (
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var db *gorm.DB
@@ -16,7 +17,9 @@ func DB() *gorm.DB {
 
 func init() {
 	var err error
-	db, err = gorm.Open(sqlite.Open("smdb.db"), &gorm.Config{})
+	db, err = gorm.Open(sqlite.Open("smdb.db"), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -25,5 +28,9 @@ func init() {
 	sqlDB.SetMaxIdleConns(1)
 	db.Exec(`PRAGMA journal_mode = WAL;`)
 	db.Exec(`PRAGMA synchronous = NORMAL;`)
+
+	// 同步数据库结构
+	db.AutoMigrate(&SMFlow{})
+
 	Migrate()
 }
