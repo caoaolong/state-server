@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 流程节点卡片：场景/选择/结果，支持复制/编辑/删除、执行请求、多 handle
+ */
 import { watch, computed, ref } from "vue";
 import { Handle, Position, type NodeProps } from "@vue-flow/core";
 import { NodeToolbar } from "@vue-flow/node-toolbar";
@@ -19,7 +22,7 @@ import {
 export type NodeState = "normal" | "running" | "paused" | "completed" | "failed";
 
 /** 节点大类：场景、选择、结果 */
-export type NodeCategory = "scene" | "choice" | "result";
+export type NodeCategory = "scene" | "choice" | "result" | "task";
 
 /** 场景子类型：开始、结束、普通 */
 export type SceneKind = "start" | "end" | "default";
@@ -92,11 +95,15 @@ const sceneKind = computed(() => props.data?.nodeKind ?? "default");
 const isScene = computed(() => category.value === "scene");
 const isStartOrEnd = computed(() => isScene.value && (sceneKind.value === "start" || sceneKind.value === "end"));
 const isNormalScene = computed(() => isScene.value && sceneKind.value === "default");
+// 任务：一入一出，同普通场景
+const isTask = computed(() => category.value === "task");
+
 const isFormNode = computed(
   () =>
     isNormalScene.value ||
     isChoice.value ||
-    isResult.value
+    isResult.value ||
+    isTask.value
 );
 const showSceneTarget = computed(
   () => isScene.value && (sceneKind.value === "end" || sceneKind.value === "default")
@@ -105,13 +112,17 @@ const showSceneSource = computed(
   () => isScene.value && (sceneKind.value === "start" || sceneKind.value === "default")
 );
 
+// 多连接桩：从顶部起算，间隔 30px
+const HANDLE_TOP_OFFSET_PX = 50;
+const HANDLE_GAP_PX = 31;
+
 // 选择：一个输入，多个输出
 const isChoice = computed(() => category.value === "choice");
 const choiceOutputCount = computed(() => Math.max(1, props.data?.outputCount ?? 2));
 const choiceOutputHandles = computed(() =>
   Array.from({ length: choiceOutputCount.value }, (_, i) => ({
     id: `source-${i}`,
-    top: choiceOutputCount.value <= 1 ? 50 : (100 * (i + 1)) / (choiceOutputCount.value + 1),
+    topPx: HANDLE_TOP_OFFSET_PX + i * HANDLE_GAP_PX,
   }))
 );
 
@@ -121,7 +132,7 @@ const resultInputCount = computed(() => Math.max(1, props.data?.inputCount ?? 2)
 const resultInputHandles = computed(() =>
   Array.from({ length: resultInputCount.value }, (_, i) => ({
     id: `target-${i}`,
-    top: resultInputCount.value <= 1 ? 50 : (100 * (i + 1)) / (resultInputCount.value + 1),
+    topPx: HANDLE_TOP_OFFSET_PX + i * HANDLE_GAP_PX,
   }))
 );
 
@@ -131,6 +142,7 @@ const emit = defineEmits<{
   copy: [nodeId: string];
   edit: [nodeId: string];
   delete: [nodeId: string];
+  "update:run-result": [payload: { nodeId: string; runResult: string; nodeState: string }];
 }>();
 
 function onCopy() {
@@ -149,40 +161,79 @@ function onRun() {
 
 async function executeRequest() {
   const data = props.data;
-  if (!data || !data.requestPath || !data.requestMethod || !props.baseUrl) {
-    message.error("请求配置不完整");
+  if (!data) return;
+
+  const setErrorResult = (msg: string) => {
+    data.runResult = `错误: ${msg}`;
+    data.nodeState = "failed";
+    emit("update:run-result", { nodeId: props.id, runResult: data.runResult, nodeState: "failed" });
+  };
+
+  if (!data.requestPath) {
+    setErrorResult("请配置请求路径");
+    message.error("请配置请求路径");
     return;
   }
 
   isRunning.value = true;
+  data.nodeState = "running";
 
   try {
-    const url = `${props.baseUrl}${data.requestPath}`;
-    const options: RequestInit = {
-      method: data.requestMethod.toUpperCase(),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    };
-
-    if (data.requestData && data.requestMethod.toUpperCase() !== "GET") {
-      try {
-        options.body = JSON.stringify(JSON.parse(data.requestData));
-      } catch {
-        options.body = data.requestData;
-      }
+    const BASE = import.meta.env.VITE_API_BASE ?? "";
+    const res = await fetch(`${BASE}/nodes/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        node: {
+          id: props.id,
+          type: props.type ?? "default",
+          position: props.position,
+          data: {
+            requestPath: data.requestPath ?? "",
+            requestMethod: data.requestMethod ?? "GET",
+            requestData: data.requestData ?? "",
+          },
+        },
+        sessionId: 0,
+      }),
+    });
+    const text = await res.text();
+    let result: { ok?: boolean; statusCode?: number; body?: string; error?: string };
+    try {
+      result = text ? JSON.parse(text) : {};
+    } catch {
+      result = { ok: false, statusCode: res.status, body: text, error: res.statusText || `HTTP ${res.status}` };
+    }
+    if (!res.ok && result.error == null) {
+      result.error = text || `HTTP ${res.status}`;
     }
 
-    const response = await fetch(url, options);
-    const responseData = await response.json();
-
-    data.runResult = JSON.stringify(responseData, null, 2);
-    message.success("请求成功");
+    if (result.ok !== false && result.body !== undefined) {
+      try {
+        data.runResult = JSON.stringify(JSON.parse(result.body), null, 2);
+      } catch {
+        data.runResult = result.body;
+      }
+      data.nodeState = "completed";
+      message.success(`请求成功 (${result.statusCode ?? res.status})`);
+    } else {
+      const errMsg = (result.error ?? result.body ?? text) || "请求失败";
+      data.runResult = `错误: ${errMsg}${result.body ? `\n\n响应: ${result.body}` : ""}`;
+      data.nodeState = "failed";
+      message.error(result.error ?? "请求失败");
+    }
   } catch (error) {
-    data.runResult = `错误: ${error instanceof Error ? error.message : String(error)}`;
+    const errMsg = error instanceof Error ? error.message : String(error);
+    data.runResult = `错误: ${errMsg}`;
+    data.nodeState = "failed";
     message.error("请求失败");
   } finally {
     isRunning.value = false;
+    emit("update:run-result", {
+      nodeId: props.id,
+      runResult: data.runResult ?? "",
+      nodeState: data.nodeState ?? "normal",
+    });
   }
 }
 </script>
@@ -193,6 +244,7 @@ async function executeRequest() {
     :class="[
       `flow-node--${category}`,
       isScene ? `flow-node--scene-${sceneKind}` : '',
+      isTask ? 'flow-node--task' : '',
     ]"
     :data-node-category="category"
     :data-node-kind="isScene ? sceneKind : undefined"
@@ -224,7 +276,7 @@ async function executeRequest() {
       :position="Position.Left"
       class="flow-node__handle"
     />
-    <!-- 结果：左侧多个 target -->
+    <!-- 结果：左侧多个 target，从顶部起算、间隔 30px -->
     <Handle
       v-for="h in resultInputHandles"
       v-else-if="isResult"
@@ -232,12 +284,19 @@ async function executeRequest() {
       :id="h.id"
       type="target"
       :position="Position.Left"
-      :style="{ top: h.top + '%', left: 0, transform: 'translate(-50%, -50%)' }"
+      :style="{ top: h.topPx + 'px', left: 0, transform: 'translate(-50%, -50%)' }"
       class="flow-node__handle flow-node__handle--multi"
     />
     <!-- 选择：左侧一个 target -->
     <Handle
       v-else-if="isChoice"
+      type="target"
+      :position="Position.Left"
+      class="flow-node__handle"
+    />
+    <!-- 任务：左侧一个 target -->
+    <Handle
+      v-else-if="isTask"
       type="target"
       :position="Position.Left"
       class="flow-node__handle"
@@ -294,6 +353,16 @@ async function executeRequest() {
               </div>
             </div>
           </template>
+
+          <!-- 任务节点：描述 -->
+          <template v-else-if="isTask">
+            <div class="flow-node__text-content" v-if="data.description">
+              {{ data.description }}
+            </div>
+            <div class="flow-node__text-empty" v-else>
+              暂无描述
+            </div>
+          </template>
         </template>
         <template v-else>
           <span class="flow-node__label">{{ data?.label ?? id }}</span>
@@ -319,7 +388,7 @@ async function executeRequest() {
             </n-button>
             <!-- 自定义节点的运行按钮 -->
             <n-button
-              v-if="(isScene || isFormNode) && data?.requestPath && data?.requestMethod && baseUrl"
+              v-if="(isScene || isFormNode) && data?.requestPath && data?.requestMethod"
               quaternary
               circle
               size="small"
@@ -343,7 +412,7 @@ async function executeRequest() {
       :position="Position.Right"
       class="flow-node__handle"
     />
-    <!-- 选择：右侧多个 source -->
+    <!-- 选择：右侧多个 source，从顶部起算、间隔 30px -->
     <Handle
       v-for="h in choiceOutputHandles"
       v-else-if="isChoice"
@@ -351,12 +420,19 @@ async function executeRequest() {
       :id="h.id"
       type="source"
       :position="Position.Right"
-      :style="{ top: h.top + '%', right: 0, left: 'auto', transform: 'translate(50%, -50%)' }"
+      :style="{ top: h.topPx + 'px', right: 0, left: 'auto', transform: 'translate(50%, -50%)' }"
       class="flow-node__handle flow-node__handle--multi"
     />
     <!-- 结果：右侧一个 source -->
     <Handle
       v-else-if="isResult"
+      type="source"
+      :position="Position.Right"
+      class="flow-node__handle"
+    />
+    <!-- 任务：右侧一个 source -->
+    <Handle
+      v-else-if="isTask"
       type="source"
       :position="Position.Right"
       class="flow-node__handle"
@@ -497,11 +573,9 @@ async function executeRequest() {
   flex-shrink: 0;
 }
 
-/* 多 handle 时垂直分布，避免重叠 */
+/* 多 handle：从顶部起算、间隔 30px，top/left/right 由内联 style 设置 */
 .flow-node__handle--multi {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
 }
 
 /* ========== 三种节点样式区分 ========== */
@@ -536,6 +610,13 @@ async function executeRequest() {
   color: #7c3aed;
 }
 
+/* 任务：青色系，一入一出 */
+.flow-node--task .flow-node__card :deep(.n-card-header),
+.flow-node--task .flow-node__handle {
+  border-color: #0d9488;
+  color: #0d9488;
+}
+
 .flow-node__text-content {
   font-size: 12px;
   line-height: 1.5;
@@ -554,15 +635,17 @@ async function executeRequest() {
 .flow-node__list-content {
   display: flex;
   flex-direction: column;
-  gap: 4px;
   width: 100%;
+  gap: 0;
 }
 
 .flow-node__list-item {
+  height: 30px;
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 12px;
+  border-bottom: 1px dashed var(--vf-node-color, #999);
 }
 
 .flow-node__list-index {
@@ -576,16 +659,4 @@ async function executeRequest() {
   white-space: nowrap;
 }
 
-.flow-node__result {
-  margin-top: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-  border-radius: 4px;
-  font-size: 11px;
-}
-
-.flow-node__result :deep(.n-code-block) {
-  background: var(--vf-node-bg, #1a192b);
-  border: 1px solid var(--vf-node-color, #999);
-}
 </style>

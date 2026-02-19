@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, h } from "vue";
 import { useRouter } from "vue-router";
-import { NDataTable, NCard, NButton, NSpace, type DataTableColumns, useMessage } from "naive-ui";
-import { getStateMachineList, deleteStateMachine, type StateMachineListItem } from "../api";
+import { NDataTable, NCard, NButton, NSpace, NPopconfirm, type DataTableColumns, useMessage } from "naive-ui";
+import { getStateMachineList, deleteStateMachine, createSession, type StateMachineListItem } from "../api";
 import { formatDateTime } from "../utils/date";
 
 const router = useRouter();
@@ -24,8 +24,37 @@ const columns: DataTableColumns<StateMachineListItem> = [
     render(_row) {
       return h(NSpace, null, {
         default: () => [
-          h(NButton, { quaternary: true, size: "small", type: "primary", onClick: () => router.push(`/state-machines/design/${_row.id}`) }, () => "设计"),
-          h(NButton, { quaternary: true, size: "small", type: "error", loading: deletingId.value === _row.id, onClick: () => handleDelete(_row) }, () => "删除"),
+          h(NButton, {
+            quaternary: true,
+            size: "small",
+            type: "primary",
+            onClick: async () => {
+              try {
+                await createSession({ stateMachineId: _row.id, sessionId: 0 });
+              } catch (_e) {
+                // 创建会话失败仍可进入设计页，runNode 时会按 sessionId=0 记录
+              }
+              router.push(`/flow/design/${_row.id}`);
+            },
+          }, () => "设计"),
+          h(
+            NPopconfirm,
+            {
+              positiveText: "删除",
+              negativeText: "取消",
+              type: "error",
+              onPositiveClick: () => handleDelete(_row),
+            },
+            {
+              default: () => `确定要删除状态机「${_row.name}」吗？此操作不可恢复。`,
+              trigger: () =>
+                h(
+                  NButton,
+                  { quaternary: true, size: "small", type: "error", loading: deletingId.value === _row.id },
+                  () => "删除"
+                ),
+            }
+          ),
         ],
       });
     },
@@ -47,7 +76,6 @@ async function fetchList() {
 
 const deletingId = ref<string | null>(null);
 async function handleDelete(row: StateMachineListItem) {
-  if (!window.confirm(`确定要删除状态机「${row.name}」吗？`)) return;
   deletingId.value = row.id;
   try {
     await deleteStateMachine(row.id);

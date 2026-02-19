@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourname/state-monitor/orm"
+	"github.com/caoaolong/state-server/orm"
 )
 
 const apiKeyPrefix = "smKey-"

@@ -4,9 +4,9 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/caoaolong/state-server/routers"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/yourname/state-monitor/routers"
 )
 
 // //go:embed web/dist/**
@@ -15,7 +15,7 @@ import (
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
-	}, 
+	},
 }
 
 func handleWebsocket(c *gin.Context) {
@@ -47,5 +47,6 @@ func main() {
 	routers.RegisterStateMachineRoutes(r)
 	routers.RegisterSessionRoutes(r)
 	routers.RegisterApiKeyRoutes(r)
+	routers.RegisterNodeRoutes(r)
 	log.Fatal(r.Run(":8080"))
 }

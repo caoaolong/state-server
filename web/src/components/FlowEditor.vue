@@ -1,4 +1,5 @@
 <script setup lang="ts">
+<<<<<<< HEAD
 import { ref, onMounted, onUnmounted, computed, nextTick, inject, reactive } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { type Node, type Edge, type Connection, type NodeChange, type EdgeChange, useVueFlow } from "@vue-flow/core";
@@ -12,12 +13,19 @@ import { getFlowData, getStateMachineById, saveFlow, createStateMachine, updateS
 import { useLayout } from "../core/layout";
 import FlowNode from "./FlowNode.vue";
 import type { FlowNodeData } from "./FlowNode.vue";
+=======
+/**
+ * 流程编辑器：仅提供路由参数与主题，具体逻辑在 FlowCanvas 内部实现
+ */
+import { computed, inject, ref } from "vue";
+import { useRoute } from "vue-router";
+import FlowCanvas from "./FlowCanvas.vue";
+>>>>>>> 7921434093a2c8557483be064053f6e791d6c826
 
 const route = useRoute();
-const router = useRouter();
-const message = useMessage();
-const dark = inject('app-dark-mode', ref(false));
+const dark = inject<ReturnType<typeof ref<boolean>>>("app-dark-mode", ref(false));
 
+<<<<<<< HEAD
 /** 状态机信息对象 */
 interface StateMachineInfo {
   /** 状态机 ID（来自路由 /state-machines/design/:id），无则为新建 */
@@ -658,10 +666,14 @@ onUnmounted(() => {
 	currentNodeState.value = null;
 	runningNodeId.value = null;
 });
+=======
+const stateMachineId = computed(() => route.params.id as string | undefined);
+>>>>>>> 7921434093a2c8557483be064053f6e791d6c826
 </script>
 
 <template>
 	<div style="height: 100%">
+<<<<<<< HEAD
 		<n-split direction="vertical" :default-size="0.7" style="height: 100%">
 			<template #1>
 				<div style="height: 100%; position: relative;">
@@ -922,9 +934,12 @@ onUnmounted(() => {
 				</n-tabs>
 			</template>
 		</n-split>
+=======
+		<FlowCanvas :state-machine-id="stateMachineId" :dark="dark" />
+>>>>>>> 7921434093a2c8557483be064053f6e791d6c826
 	</div>
 </template>
 
 <style>
-/* VueFlow Styles ... */
+/* VueFlow 全局样式如需可保留 */
 </style>

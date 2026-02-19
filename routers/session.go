@@ -5,12 +5,51 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourname/state-monitor/orm"
+	"github.com/caoaolong/state-server/orm"
 )
 
 func RegisterSessionRoutes(r *gin.Engine) {
 	g := r.Group("/sessions")
 	db := orm.DB()
+
+	// 创建会话（设计页进入时调用，sessionId 固定为 0 表示设计会话）
+	g.POST("", func(ctx *gin.Context) {
+		var req struct {
+			StateMachineID string `json:"stateMachineId" binding:"required"`
+			SessionID      int64  `json:"sessionId"` // 固定传 0
+		}
+		if err := ctx.ShouldBindJSON(&req); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "参数错误: " + err.Error()})
+			return
+		}
+		smID, err := strconv.ParseInt(req.StateMachineID, 10, 64)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "无效的 stateMachineId"})
+			return
+		}
+		logicalID := req.SessionID
+		var flow orm.SMFlow
+		if err := db.First(&flow, smID).Error; err != nil {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "状态机不存在"})
+			return
+		}
+		var session orm.SessionInfo
+		err = db.Where("sm_id = ? AND logical_session_id = ?", smID, logicalID).First(&session).Error
+		if err != nil {
+			session = orm.SessionInfo{SMID: smID, LogicalSessionID: logicalID, State: "", Status: "running"}
+			if err := db.Create(&session).Error; err != nil {
+				ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+		}
+		ctx.JSON(http.StatusOK, gin.H{
+			"id":             strconv.FormatInt(session.ID, 10),
+			"sessionId":     session.LogicalSessionID,
+			"stateMachineId": strconv.FormatInt(session.SMID, 10),
+			"status":         session.Status,
+			"createdAt":      session.CreatedAt.Format("2006-01-02T15:04:05.000Z07:00"),
+		})
+	})
 
 	// 获取会话历史（必须写在 GET /:id 之前，否则 /history 会被匹配成 id=history）
 	g.GET("/history", func(ctx *gin.Context) {
@@ -47,6 +86,7 @@ func RegisterSessionRoutes(r *gin.Engine) {
 			list = append(list, gin.H{
 				"id":        strconv.FormatInt(r.ID, 10),
 				"sessionId": strconv.FormatInt(r.SessionID, 10),
+				"nodeId":    r.NodeID,
 				"event":     r.Event,
 				"fromState": r.FromState,
 				"toState":   r.ToState,
@@ -94,7 +134,7 @@ func RegisterSessionRoutes(r *gin.Engine) {
 		for _, r := range rows {
 			list = append(list, gin.H{
 				"id":             strconv.FormatInt(r.ID, 10),
-				"sessionId":      strconv.FormatInt(r.ID, 10),
+				"sessionId":      strconv.FormatInt(r.LogicalSessionID, 10),
 				"stateMachineId": strconv.FormatInt(r.SMID, 10),
 				"status":         r.Status,
 				"createdAt":      r.CreatedAt.Format("2006-01-02T15:04:05.000Z07:00"),
@@ -118,7 +158,7 @@ func RegisterSessionRoutes(r *gin.Engine) {
 		}
 		ctx.JSON(http.StatusOK, gin.H{
 			"id":             strconv.FormatInt(s.ID, 10),
-			"sessionId":      strconv.FormatInt(s.ID, 10),
+			"sessionId":      strconv.FormatInt(s.LogicalSessionID, 10),
 			"stateMachineId": strconv.FormatInt(s.SMID, 10),
 			"status":         s.Status,
 			"createdAt":      s.CreatedAt.Format("2006-01-02T15:04:05.000Z07:00"),

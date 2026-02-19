@@ -10,10 +10,10 @@ declare module "vue-router" {
 const routes: RouteRecordRaw[] = [
   {
     path: "/",
-    redirect: "/state-machines/list",
+    redirect: "/flow/list",
   },
   {
-    path: "/state-machines",
+    path: "/flow",
     children: [
       {
         path: "list",

@@ -20,7 +20,7 @@ const apiSections = [
       {
         name: "获取状态机列表",
         method: "GET",
-        path: "/state-machines",
+        path: "/flow",
         auth: false,
         request: {
           type: "query",
@@ -47,7 +47,7 @@ const apiSections = [
       {
         name: "获取状态机详情",
         method: "GET",
-        path: "/state-machines/:id",
+        path: "/flow/:id",
         auth: false,
         request: { type: "path", params: [{ name: "id", type: "string", required: true, desc: "状态机 ID" }] },
         response: `{
@@ -66,7 +66,7 @@ const apiSections = [
       {
         name: "获取流程数据",
         method: "GET",
-        path: "/state-machines/:id/flow",
+        path: "/flow/:id/flow",
         auth: false,
         request: { type: "path", params: [{ name: "id", type: "string", required: true, desc: "状态机 ID" }] },
         response: `{
@@ -87,7 +87,7 @@ const apiSections = [
       {
         name: "创建状态机",
         method: "POST",
-        path: "/state-machines",
+        path: "/flow",
         auth: false,
         request: {
           type: "body",
@@ -108,7 +108,7 @@ const apiSections = [
       {
         name: "更新状态机",
         method: "PUT",
-        path: "/state-machines/:id",
+        path: "/flow/:id",
         auth: false,
         request: {
           type: "path+body",
@@ -130,7 +130,7 @@ const apiSections = [
       {
         name: "保存流程",
         method: "PUT",
-        path: "/state-machines/:id/flow",
+        path: "/flow/:id/flow",
         auth: false,
         request: {
           type: "path+body",
@@ -149,7 +149,7 @@ const apiSections = [
       {
         name: "删除状态机",
         method: "DELETE",
-        path: "/state-machines/:id",
+        path: "/flow/:id",
         auth: false,
         request: { type: "path", params: [{ name: "id", type: "string", required: true, desc: "状态机 ID" }] },
         response: "无 body，成功为 2xx",
